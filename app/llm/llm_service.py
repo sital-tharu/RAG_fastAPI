@@ -1,5 +1,5 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import LLMChain
+
 from app.core.config import get_settings
 from app.llm.prompt_templates import FINANCIAL_QA_PROMPT
 
@@ -15,10 +15,8 @@ class LLMService:
             temperature=0.0
         )
         
-        self.chain = LLMChain(
-            llm=self.llm,
-            prompt=FINANCIAL_QA_PROMPT
-        )
+        # LCEL Chain: Prompt | LLM
+        self.chain = FINANCIAL_QA_PROMPT | self.llm
 
     async def generate_answer(self, question: str, context: str) -> str:
         """
@@ -28,10 +26,12 @@ class LLMService:
             return "I cannot answer this question as no relevant financial data was found in my database for this company."
             
         try:
-            response = await self.chain.arun(
-                question=question,
-                context=context
-            )
-            return response
+            # invoke chain with input dict
+            response = await self.chain.ainvoke({
+                "question": question,
+                "context": context
+            })
+            # ChatGoogleGenerativeAI returns an AIMessage, we need the content
+            return response.content
         except Exception as e:
             return f"Error generating answer: {str(e)}"

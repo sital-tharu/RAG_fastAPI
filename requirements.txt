@@ -12,7 +12,7 @@ aiohttp
 sentence-transformers
 chromadb
 google-generativeai
-langchain
+langchain-core
 langchain-google-genai
 pytest
 pytest-asyncio

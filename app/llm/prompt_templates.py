@@ -1,4 +1,4 @@
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 # Strict prompt template to prevent hallucinations
 FINANCIAL_QA_PROMPT_STR = """You are a financial analyst assistant. Answer the question based ONLY on the provided financial data.

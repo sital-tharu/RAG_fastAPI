@@ -1,10 +1,12 @@
+from __future__ import annotations
 from typing import List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.ingestion.data_fetchers import YahooFinanceFetcher
-from app.ingestion.data_normalizer import DataNormalizer, StandardizedFinancials
+from app.ingestion.data_normalizer import DataNormalizer, StandardizedFinancials, LineItem
+from datetime import datetime
 from app.models.models import Company, FinancialStatement, FinancialLineItem
 from app.core.vector_store import vector_store
 
@@ -138,4 +140,4 @@ class IngestionService:
         )
         
         await self.db.execute(stmt)
-from datetime import datetime
+
