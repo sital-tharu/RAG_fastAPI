@@ -30,6 +30,7 @@ class FinancialStatement(Base):
     source = Column(String(50))
     raw_data = Column(JSON)  # Store original API response
     created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint('company_id', 'statement_type', 'period_type', 'period_date', name='uq_company_statement_period'),

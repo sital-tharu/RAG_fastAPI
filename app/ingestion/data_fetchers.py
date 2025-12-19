@@ -54,4 +54,6 @@ class YahooFinanceFetcher(FinancialDataFetcher):
         df.columns = df.columns.astype(str)
         
         # Replace NaN with None
+        # Must cast to object to ensure None is preserved and not converted back to NaN
+        df = df.astype(object)
         return df.where(pd.notnull(df), None).to_dict()

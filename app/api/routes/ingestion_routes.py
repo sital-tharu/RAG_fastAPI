@@ -26,5 +26,7 @@ async def ingest_company(request: IngestRequest, db: AsyncSession = Depends(get_
             chunks=result.get("chunks", 0),
             message="Successfully ingested financial data"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
