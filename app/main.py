@@ -5,6 +5,8 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.core.config import get_settings
 from app.api.routes import ingestion_routes, query_routes, health_routes
 
@@ -22,6 +24,9 @@ app.include_router(ingestion_routes.router, prefix="/api/v1/ingest", tags=["Inge
 app.include_router(query_routes.router, prefix="/api/v1/query", tags=["Query"])
 app.include_router(health_routes.router, prefix="/api/v1/health", tags=["Health"])
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 async def root():
-    return {"message": "Financial RAG API is running. Check /docs for API documentation."}
+    return FileResponse('static/index.html')
