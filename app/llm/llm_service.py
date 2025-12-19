@@ -10,7 +10,7 @@ class LLMService:
         # Initialize Google Gemini
         # Temperature 0 for maximum factuality
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model="gemini-2.5-flash",
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=0.0
         )
