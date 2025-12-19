@@ -1,6 +1,6 @@
 import asyncio
-import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.sql import text
 from app.core.config import get_settings
 from app.models.models import Base
 from app.core.database import engine as app_engine
@@ -9,12 +9,11 @@ settings = get_settings()
 
 async def create_database():
     """Create the database if it doesn't exist"""
-    # Parse the URL to get the base URL (without db name) and the db name
-    # Assumption: DATABASE_URL format is postgresql+asyncpg://user:pass@host:port/dbname
-    
     url_str = settings.DATABASE_URL
-    if "postgresql+asyncpg://" in url_str:
-        clean_url = url_str.replace("postgresql+asyncpg://", "postgres://")
+    if "postgresql+psycopg://" in url_str:
+        clean_url = url_str.replace("postgresql+psycopg://", "postgresql://")
+    elif "postgresql+asyncpg://" in url_str:
+        clean_url = url_str.replace("postgresql+asyncpg://", "postgresql://")
     else:
         clean_url = url_str
 
@@ -22,28 +21,36 @@ async def create_database():
     parsed = urlparse(clean_url)
     db_name = parsed.path.lstrip('/')
     
-    # Connect to the default 'postgres' database to create the new DB
-    sys_url = f"postgresql://{parsed.username}:{parsed.password}@{parsed.hostname}:{parsed.port}/postgres"
+    # Connect to 'postgres' system database
+    # Construct async driver URL for system DB
+    # We need to use the same driver as configured (postgresql+psycopg)
+    driver_prefix = settings.DATABASE_URL.split("://")[0]
+    sys_url = f"{driver_prefix}://{parsed.username}:{parsed.password}@{parsed.hostname}:{parsed.port}/postgres"
     
     print(f"Checking if database '{db_name}' exists...")
     
+    # Create a temporary engine for system operations with AUTOCOMMIT
+    sys_engine = create_async_engine(sys_url, isolation_level="AUTOCOMMIT")
+    
     try:
-        conn = await asyncpg.connect(sys_url)
-        # Check if database exists
-        exists = await conn.fetchval(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'")
-        
-        if not exists:
-            print(f"Database '{db_name}' does not exist. Creating...")
-            await conn.execute(f'CREATE DATABASE "{db_name}"')
-            print(f"Database '{db_name}' created successfully.")
-        else:
-            print(f"Database '{db_name}' already exists.")
+        async with sys_engine.connect() as conn:
+            # Check if database exists
+            from sqlalchemy import text
+            result = await conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'"))
+            exists = result.scalar()
             
-        await conn.close()
+            if not exists:
+                print(f"Database '{db_name}' does not exist. Creating...")
+                await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+                print(f"Database '{db_name}' created successfully.")
+            else:
+                print(f"Database '{db_name}' already exists.")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Error checking/creating database: {e}")
-        print("Please ensure your PostgreSQL server is running and the credentials in .env are correct.")
-        return
+    finally:
+        await sys_engine.dispose()
 
 async def init_tables():
     """Create tables defined in SQLAlchemy models"""

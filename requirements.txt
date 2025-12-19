@@ -1,7 +1,8 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 sqlalchemy==2.0.25
-asyncpg==0.29.0
+psycopg[binary]
+
 alembic==1.13.1
 pydantic==2.5.3
 pydantic-settings==2.1.0
@@ -15,7 +16,7 @@ aiohttp==3.9.1
 # Embeddings & Vector Store
 sentence-transformers==2.3.1
 chromadb==0.4.22
-faiss-cpu==1.7.4
+
 
 # LLM
 google-generativeai==0.3.2
