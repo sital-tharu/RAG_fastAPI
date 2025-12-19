@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial RAG Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar for Ingestion -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>FinRAG</h1>
+            </div>
+
+            <div class="ingest-section">
+                <h2>Ingest Company</h2>
+                <div class="input-group">
+                    <input type="text" id="tickerInput" placeholder="Enter Ticker (e.g. TCS.NS)" autocomplete="off">
+                    <button id="ingestBtn" class="primary-btn">Ingest</button>
+                </div>
+                <div id="ingestStatus" class="status-msg"></div>
+            </div>
+
+            <div class="info-section">
+                <h3>Capabilities</h3>
+                <ul>
+                    <li>Annual & Quarterly Data</li>
+                    <li>Balance Sheets</li>
+                    <li>Income Statements</li>
+                    <li>Semantic Search</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <div class="chat-header">
+                <h2>Financial Assistant</h2>
+                <span class="model-badge">Gemini 2.5 Flash</span>
+            </div>
+
+            <div id="chatContainer" class="chat-messages">
+                <div class="message bot-message">
+                    <div class="message-content">
+                        Hello! I'm your financial AI assistant. Ingest a company ticker on the left, then ask me
+                        anything about its financials.
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-wrapper">
+                    <textarea id="queryInput" placeholder="Ask a financial question..." rows="1"></textarea>
+                    <button id="sendBtn" class="send-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
