@@ -90,14 +90,14 @@ python run.py
 
 ### 1. Ingest Data
 Use the Web UI or the API to ingest financial data for a company.
--   **UI**: Enter a ticker symbol (e.g., `AAPL`, `MSFT`, `TCS.NS`) in the "Ingest Ticker" box and click "Ingest".
+-   **UI**: Enter a ticker symbol (e.g., `RELIANCE.NS`, `TCS.NS`, `INFY.NS`) in the "Ingest Ticker" box and click "Ingest".
 -   **API**: `POST /api/v1/ingest/company/{ticker}`
 
 ### 2. Chat with Data
 Once data is ingested, you can ask questions like:
--   "What was the total revenue of AAPL in 2023?"
--   "Compare the net income of Microsoft over the last 3 years."
--   "What are the major expenses for TCS?"
+-   "What was the total revenue of RELIANCE in 2023?"
+-   "Compare the net income of TCS over the last 3 years."
+-   "What are the major expenses for INFY?"
 
 The system will retrieve relevant financial context and generate an answer using Gemini.
 
