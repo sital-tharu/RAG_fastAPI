@@ -26,6 +26,8 @@ class YahooFinanceFetcher(FinancialDataFetcher):
         quarterly_balance_sheet = stock.quarterly_balance_sheet
         income_stmt = stock.income_stmt
         quarterly_income_stmt = stock.quarterly_income_stmt
+        cash_flow = stock.cashflow
+        quarterly_cash_flow = stock.quarterly_cashflow
         
         # Basic info
         info = stock.info
@@ -39,6 +41,10 @@ class YahooFinanceFetcher(FinancialDataFetcher):
             "income_statement": {
                 "annual": self._df_to_dict(income_stmt),
                 "quarterly": self._df_to_dict(quarterly_income_stmt)
+            },
+            "cash_flow": {
+                "annual": self._df_to_dict(cash_flow),
+                "quarterly": self._df_to_dict(quarterly_cash_flow)
             }
         }
 

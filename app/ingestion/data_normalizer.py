@@ -30,6 +30,11 @@ class DataNormalizer:
         is_data = raw_data.get("income_statement", {})
         normalized_data.extend(self._process_statement(is_data.get("annual", {}), "income_statement", "annual"))
         normalized_data.extend(self._process_statement(is_data.get("quarterly", {}), "income_statement", "quarterly"))
+
+        # Process Cash Flow
+        cf_data = raw_data.get("cash_flow", {})
+        normalized_data.extend(self._process_statement(cf_data.get("annual", {}), "cash_flow", "annual"))
+        normalized_data.extend(self._process_statement(cf_data.get("quarterly", {}), "cash_flow", "quarterly"))
         
         return normalized_data
 

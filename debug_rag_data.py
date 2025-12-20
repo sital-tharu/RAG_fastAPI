@@ -45,8 +45,8 @@ async def main():
                 result_items = await session.execute(stmt_items)
                 items = result_items.scalars().all()
                 
-                # Check for "Operating Margin" or similar
-                op_margin = [i for i in items if "margin" in i.line_item_name.lower() or "operating" in i.line_item_name.lower()]
+                # Check for "Operating Margin" or "Capital Expenditure"
+                op_margin = [i for i in items if "margin" in i.line_item_name.lower() or "capex" in i.line_item_name.lower() or "capital" in i.line_item_name.lower()]
                 
                 print(f"    Total Line Items: {len(items)}")
                 if op_margin:

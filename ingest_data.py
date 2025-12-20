@@ -10,7 +10,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 async def main():
-    ticker = "TCS.NS"
+    ticker = sys.argv[1] if len(sys.argv) > 1 else "TCS.NS"
     print(f"Starting ingestion for {ticker}...")
     
     async with AsyncSessionLocal() as db:
