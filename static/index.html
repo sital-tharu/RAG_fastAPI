@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,9 +8,12 @@
     <!-- Google Fonts for Premium Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar -->
@@ -18,20 +22,20 @@
                 <div class="logo-icon">F</div>
                 <h1>Financial RAG</h1>
             </div>
-            
+
             <div class="control-panel">
                 <div class="input-group">
                     <label>COMPANY TICKER</label>
                     <div class="input-wrapper">
-                        <input type="text" id="tickerInput" placeholder="e.g. INFY.NS" value="INFY.NS">
+                        <input type="text" id="tickerInput" placeholder="e.g. RELIANCE.NS">
                     </div>
                 </div>
-                
+
                 <button id="ingestBtn" class="premium-btn">
                     <span class="btn-text">Ingest Data</span>
                     <div class="btn-shine"></div>
                 </button>
-                
+
                 <div id="ingestStatus" class="status-indicator">Ready</div>
             </div>
 
@@ -57,7 +61,8 @@
                 <div class="message bot-message">
                     <div class="avatar">AI</div>
                     <div class="message-content">
-                        Hello! I am your Financial RAG Agent. I can analyze financial statements for Indian companies. <br><br>
+                        Hello! I am your Financial RAG Agent. I can analyze financial statements for Indian companies.
+                        <br><br>
                         <strong>How to start:</strong><br>
                         1. Enter a ticker (e.g., RELIANCE.NS) and click <em>Ingest Data</em>.<br>
                         2. Ask me about Revenue, Margins, or Capex.
@@ -66,16 +71,11 @@
             </div>
 
             <div class="input-area">
-                <div class="suggestion-chips">
-                    <button class="chip">💰 Total Revenue</button>
-                    <button class="chip">📉 Capital Expenditure</button>
-                    <button class="chip">📊 Net Profit Margin</button>
-                    <button class="chip">📅 Revenue FY2022</button>
-                </div>
                 <div class="input-wrapper">
                     <textarea id="queryInput" placeholder="Ask about revenue, capex, or margins..." rows="1"></textarea>
                     <button id="sendBtn" class="send-btn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                         </svg>
@@ -88,4 +88,5 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="/static/script.js"></script>
 </body>
+
 </html>

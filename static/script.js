@@ -136,20 +136,4 @@ document.addEventListener('DOMContentLoaded', () => {
             handleQuery();
         }
     });
-
-    // Suggestion Chips Logic
-    document.querySelectorAll('.chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const query = chip.textContent.substring(2).trim(); // Remove emoji
-
-            // Special handling for Historical
-            if (query.includes('Revenue FY2022')) {
-                queryInput.value = "What was the total revenue in FY 2022?";
-            } else {
-                queryInput.value = "What is the " + query + "?";
-            }
-
-            handleQuery();
-        });
-    });
 });
