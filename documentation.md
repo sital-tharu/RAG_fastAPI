@@ -515,6 +515,4 @@ gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 
 ---
 
-**Last Updated**: 2025-12-20  
-**Version**: 1.0  
-**Author**: Financial RAG Development Team
+
