@@ -19,6 +19,8 @@ async def ingest_company(request: IngestRequest, db: AsyncSession = Depends(get_
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("message"))
             
+        await db.commit()
+            
         return IngestResponse(
             status="success",
             company=result.get("company", "Unknown"),
