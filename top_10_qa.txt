@@ -1,0 +1,31 @@
+# Financial RAG System - Top 10 Q&A
+
+## 1. How do you ensure the LLM is not hallucinating financial numbers?
+Multi-layered defense: strict system prompt (no external knowledge), temperature=0.0 (zero creativity), mandatory citations, and empty context triggers refusal before LLM is called.
+
+## 2. How do you know the answer comes from your data and not from the LLM's training?
+Citations include specific fiscal year and statement type from your database. Test with FY2025 data (beyond training cutoff) or obscure line items. Empty context = refusal, proving data was retrieved.
+
+## 3. Why do you use both PostgreSQL and a vector database?
+PostgreSQL for precise numerical queries with metadata filtering (ticker, year). ChromaDB for semantic/fuzzy matching ("earnings" → "Net Income"). Hybrid retrieval combines both strengths.
+
+## 4. Why don't you let the LLM calculate ratios or margins?
+LLMs predict tokens, not compute math. For 12-digit financial numbers, even small errors are unacceptable. Pre-compute ratios in Python, then LLM only restates/cites them.
+
+## 5. How do you handle time — fiscal years vs quarters?
+Explicit metadata: `period_type` (annual/quarterly), `fiscal_year`, `fiscal_quarter`. Regex extracts years from queries. Period labels like "FY2022 (Annual)" prevent ambiguity.
+
+## 6. What happens if data is missing or incomplete?
+Graceful degradation at every layer: empty DataFrames return empty dicts, None values are skipped, empty retrieval triggers pre-defined refusal. App never crashes or fabricates.
+
+## 7. How does this system scale to hundreds or thousands of companies?
+Current design handles 10-50 companies. For scale: add database indexes, upgrade ChromaDB to Pinecone/pgvector, parallel ingestion, Redis caching, Kubernetes for horizontal scaling.
+
+## 8. Why did you choose Yahoo Finance, and what are its limitations?
+Chosen for: free, easy (yfinance library), supports NSE/BSE tickers. Limitations: unofficial API (may break), rate limiting, delayed/missing data, ~5 years history only.
+
+## 9. How do you version or update financial data over time?
+Current: Upsert on conflict (overwrites with timestamps). True versioning would need: history tables, temporal columns, or event sourcing for audit trails and point-in-time queries.
+
+## 10. If the LLM API fails, what still works?
+Everything except answer generation: ingestion, PostgreSQL queries, vector search, retrieval pipeline, web UI. LLM errors return graceful message, app continues running.
