@@ -1,77 +1,41 @@
 # Financial RAG Agent
 
-A premium, strictly governed Retrieval-Augmented Generation (RAG) system designed for accurate financial analysis of Indian stocks (NSE).
-
-![Financial RAG UI](static/screenshot_placeholder.png)
+A premium, governed AI assistant for analyzing Indian stock market data.
 
 ## Features
+- **Strict Governance**: Zero hallucinations, citation required.
+- **Data Support**: Annual & Quarterly Income, Balance Sheet, and Cash Flows.
+- **Premium UI**: Dark mode with glassmorphism design.
 
-### 1. 🛡️ Strict Financial Governance
-- **Zero Hallucination Policy**: Refuses to answer queries outside the provided data.
-- **Stock Prediction Firewall**: Explicitly refuses to forecast stock prices.
-- **Capital Expenditure Logic**: Correctly misinterprets negative Cash Flow values as outflows, with clear explanations.
-- **Citation System**: Every fact is cited with `[Source: FYxxxx (Statement Type)]`.
+## Quick Start
 
-### 2. 📊 Comprehensive Data Analysis
-- **Historical Data**: Access to full Annual and Quarterly data (e.g., FY2021-FY2025).
-- **Core Statements**:
-  - Income Statement (Revenue, Net Profit, Margins)
-  - Balance Sheet (Assets, Liabilities, Equity)
-  - Cash Flow (CapEx, Operating Cash)
-- **Ratio Calculation**: Automatically calculates key metrics if not present.
+### 1. Requirements
+- Python 3.10+
+- PostgreSQL
+- Google Gemini API Key
 
-### 3. 💎 Premium Experience
-- **Dark Mode UI**: Glassmorphism design with responsive chat interface.
-- **Windows Optimized**: Custom backend architecture to prevent `asyncio` crashes on Windows.
-- **Smart Formatting**: Markdown rendering for clear, readable financial summaries.
+### 2. Setup
+```bash
+git clone https://github.com/sital-tharu/RAG_fastAPI.git
+cd RAG_fastAPI
+pip install -r requirements.txt
+```
 
-## Installation
+Create a `.env` file:
+```env
+GOOGLE_API_KEY=your_key
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost/dbname
+```
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/sital-tharu/RAG_fastAPI.git
-   cd RAG_fastAPI
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *Note: Requires Python 3.10+*
-
-3. **Configure Environment**
-   Create a `.env` file:
-   ```env
-   GOOGLE_API_KEY=your_gemini_api_key
-   DATABASE_URL=postgresql+asyncpg://user:password@localhost/dbname
-   ```
-
-## Usage
-
-### 1. Start the Server
+### 3. Run
 ```bash
 python run.py
 ```
-Access the app at `http://localhost:8000`.
+Open [http://localhost:8000](http://localhost:8000).
 
-### 2. Ingest Data (Windows-Safe)
-Use the included script for reliable ingestion:
-```bash
-# Default (TCS.NS)
-python ingest_data.py
+### 4. How to Use
+1. **Ingest**: Type a ticker (e.g., `RELIANCE.NS`) in the Web UI or run `python ingest_data.py RELIANCE.NS`.
+2. **Ask**: Query for Revenue, Margins, or CapEx.
 
-# specific Ticker
-python ingest_data.py RELIANCE.NS
-```
-*Note: You can also use the "Ingest" button in the Web UI.*
-
-### 3. Ask Questions
-- **Historical**: "What was the Total Revenue in FY 2022?"
-- **Analysis**: "What is the Net Profit Margin for the latest year?"
-- **Governance Test**: "Will the stock price go up?" (Should be refused)
-
-## Technology Stack
-- **Backend**: FastAPI, SQLAlchemy (Async), PostgreSQL
-- **AI/LLM**: Google Gemini 2.5 Flash, LangChain
-- **Frontend**: HTML5, Vanilla JS, Glassmorphism CSS
-- **Vector Store**: ChromaDB (Conditional/Platform-Aware)
+---
+*Powered by FastAPI, LangChain, and Google Gemini.*
