@@ -11,7 +11,7 @@ if sys.platform == "win32":
 
 async def main():
     ticker = "RELIANCE.NS"
-    query = "What is the total revenue of Reliance Industries in the latest fiscal year?"
+    query = "What was the capital expenditure in FY2022?"
     
     print(f"--- Testing RAG Query for {ticker} ---")
     print(f"Query: {query}")
@@ -69,9 +69,11 @@ async def main():
         print("\nSending to LLM (Gemini)...")
         try:
             answer = await llm_service.generate_answer(query, context_str)
-            print("\n=== ANSWER ===")
-            print(answer)
-            print("==================")
+            
+            print(f"\n=== ANSWER ===\n{answer}\n==================")
+            
+            with open("last_answer.txt", "w", encoding="utf-8") as f:
+                f.write(answer)
         except Exception as e:
             print(f"\nERROR calling LLM: {e}")
             print("Verify your GOOGLE_API_KEY in .env")
