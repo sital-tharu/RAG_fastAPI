@@ -8,54 +8,72 @@ settings = get_settings()
 
 class VectorStore:
     def __init__(self):
-        self.client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
-        
-        # Use sentence-transformers for proper embeddings
-        # This runs locally and matches "all-MiniLM-L6-v2"
+        # We generally don't initialize PersistentClient here to avoid
+        # "SQLite objects created in a thread can only be used in that same thread"
+        # when running in run_in_executor.
+        self.settings = settings
         self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=settings.EMBEDDING_MODEL
+            model_name=self.settings.EMBEDDING_MODEL
         )
-        
-        self.collection = self.client.get_or_create_collection(
+
+    def _get_collection_sync(self):
+        """Helper to get collection in the current thread context"""
+        import chromadb
+        client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
+        return client.get_or_create_collection(
             name="financial_data",
             embedding_function=self.embedding_fn
         )
 
     async def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
-        """Add texts and metadata to the vector store"""
+        """Add texts and metadata to the vector store (Non-blocking)"""
+        import sys
+        if sys.platform == "win32":
+            # Skip on Windows to avoid crashes in FastAPI
+            return
+
         if not texts:
             return
             
-        # Chroma expects ids
         import uuid
         ids = [str(uuid.uuid4()) for _ in texts]
         
-        # Add to collection
-        self.collection.add(
-            documents=texts,
-            metadatas=metadatas,
-            ids=ids
-        )
+        def _add_sync():
+            collection = self._get_collection_sync()
+            collection.add(
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+        
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _add_sync)
 
     async def similarity_search(self, query: str, n_results: int = 5, filter: Dict = None) -> List[Dict]:
-        """Search for similar documents"""
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            where=filter
-        )
+        """Search for similar documents (Non-blocking)"""
         
-        # Format results
-        formatted_results = []
-        if results['documents']:
-            for i, doc in enumerate(results['documents'][0]):
-                formatted_results.append({
-                    "text": doc,
-                    "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
-                    "distance": results['distances'][0][i] if results['distances'] else 0.0
-                })
-                
-        return formatted_results
+        def _search_sync():
+            collection = self._get_collection_sync()
+            results = collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                where=filter
+            )
+            # Format results inside the thread
+            formatted_results = []
+            if results['documents']:
+                for i, doc in enumerate(results['documents'][0]):
+                    formatted_results.append({
+                        "text": doc,
+                        "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
+                        "distance": results['distances'][0][i] if results['distances'] else 0.0
+                    })
+            return formatted_results
+
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _search_sync)
 
 # Global instance
 vector_store = VectorStore()

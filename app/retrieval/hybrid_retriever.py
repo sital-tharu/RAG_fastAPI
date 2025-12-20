@@ -26,17 +26,16 @@ class HybridRetriever:
             sql_results.extend(sql_data)
 
         # Vector Retrieval (for Factual or Hybrid)
-        # Always running vector search is usually safer to get context even for numeric queries.
-        # But strict numeric queries might not need it if SQL is perfect. 
-        # Let's run it unless strictly purely calculation without context needed? 
-        # Actually, plan says "Hybrid Retrieval -> 3. Retrieve supporting context".
-        
-        # We filter vector search by ticker in metadata
-        vector_data = await vector_store.similarity_search(
-            query, 
-            n_results=5, 
-            filter={"ticker": ticker}
-        )
+        # We skip vector search on Windows due to known stability issues with ChromaDB + Asyncio
+        import sys
+        if sys.platform == "win32":
+            vector_data = []
+        else:
+            vector_data = await vector_store.similarity_search(
+                query, 
+                n_results=5, 
+                filter={"ticker": ticker}
+            )
         vector_results.extend(vector_data)
 
         return {

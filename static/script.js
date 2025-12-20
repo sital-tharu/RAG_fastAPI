@@ -6,15 +6,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const queryInput = document.getElementById('queryInput');
     const chatContainer = document.getElementById('chatContainer');
 
+    // Auto-resize textarea
+    queryInput.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+        if (this.value === '') this.style.height = '50px';
+    });
+
     // Ingestion Logic
     ingestBtn.addEventListener('click', async () => {
         const ticker = tickerInput.value.trim().toUpperCase();
         if (!ticker) return;
 
         ingestBtn.disabled = true;
-        ingestBtn.textContent = '...';
-        ingestStatus.className = 'status-msg';
-        ingestStatus.textContent = 'Ingesting data...';
+        ingestBtn.innerHTML = '<span class="btn-text">Ingesting...</span>';
+        ingestStatus.className = 'status-indicator';
+        ingestStatus.textContent = 'Processing financial data...';
 
         try {
             const response = await fetch('/api/v1/ingest/company', {
@@ -25,28 +32,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 const data = await response.json();
-                ingestStatus.className = 'status-msg status-success';
-                ingestStatus.textContent = `Success! Added ${data.statements} statements.`;
-                // Optionally save ticker to context
+                ingestStatus.className = 'status-indicator status-success';
+                ingestStatus.textContent = `Success!`;
                 localStorage.setItem('currentTicker', ticker);
+                appendMessage(`Successfully ingested data for ${ticker}. You can now ask questions!`, 'bot');
             } else {
                 const error = await response.json();
-                ingestStatus.className = 'status-msg status-error';
-                ingestStatus.textContent = error.detail || 'Ingestion failed';
+                throw new Error(error.detail || 'Ingestion failed');
             }
         } catch (e) {
-            ingestStatus.className = 'status-msg status-error';
-            ingestStatus.textContent = 'Network Error';
+            ingestStatus.className = 'status-indicator status-error';
+            ingestStatus.textContent = 'Error (Check Console)';
+            console.error(e);
+            appendMessage(`<strong>Ingestion Error:</strong> The server might be unstable on Windows. <br>Please run <code>python ingest_data.py ${ticker}</code> in your terminal instead.`, 'bot');
         } finally {
             ingestBtn.disabled = false;
-            ingestBtn.textContent = 'Ingest';
+            ingestBtn.innerHTML = '<span class="btn-text">Ingest Data</span><div class="btn-shine"></div>';
         }
     });
 
     // Chat Logic
     const appendMessage = (text, sender) => {
         const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${sender}-message`;
+        msgDiv.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
+
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        avatarDiv.textContent = sender === 'user' ? 'ME' : 'AI';
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
@@ -57,10 +69,17 @@ document.addEventListener('DOMContentLoaded', () => {
             contentDiv.textContent = text;
         }
 
-        msgDiv.appendChild(contentDiv);
+        if (sender === 'user') {
+            msgDiv.appendChild(contentDiv);
+            msgDiv.appendChild(avatarDiv);
+        } else {
+            msgDiv.appendChild(avatarDiv);
+            msgDiv.appendChild(contentDiv);
+        }
+
         chatContainer.appendChild(msgDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
-        return contentDiv;
+        return msgDiv; // Return div to remove later if needed (loading)
     };
 
     const handleQuery = async () => {
@@ -69,17 +88,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!query) return;
         if (!ticker) {
-            alert('Please ingest a company ticker first (or enter one in the sidebar).');
+            alert('Please ingest a company ticker first.');
             return;
         }
 
         appendMessage(query, 'user');
         queryInput.value = '';
+        queryInput.style.height = '50px';
 
-        // Loading State
+        // Loading Indicator
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'message bot-message';
-        loadingDiv.innerHTML = '<div class="message-content"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
+        loadingDiv.innerHTML = `
+            <div class="avatar">AI</div>
+            <div class="message-content">
+                <div class="typing-indicator"><span></span><span></span><span></span></div>
+            </div>`;
         chatContainer.appendChild(loadingDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -96,12 +120,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendMessage(data.answer, 'bot');
             } else {
                 const error = await response.json();
-                chatContainer.removeChild(loadingDiv);
-                appendMessage(`Error: ${error.detail || 'Failed to get answer'}`, 'bot');
+                throw new Error(error.detail || 'Data retrieval failed');
             }
         } catch (e) {
             chatContainer.removeChild(loadingDiv);
-            appendMessage('Network Error: Could not reach server.', 'bot');
+            console.error(e);
+            appendMessage(`<strong>Network Error:</strong> Could not connect to the backend. <br>Please check if <code>python run.py</code> is running.`, 'bot');
         }
     };
 
