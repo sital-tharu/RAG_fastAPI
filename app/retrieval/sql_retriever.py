@@ -7,7 +7,7 @@ class SQLRetriever:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def retrieve_financial_data(self, ticker: str, query_text: str, limit: int = 20) -> List[Dict]:
+    async def retrieve_financial_data(self, ticker: str, query_text: str, limit: int = 100) -> List[Dict]:
         """
         Retrieve financial data from PostgreSQL based on ticker and query context.
         Note: accurately mapping NL query to specific line items is hard without LLM.
@@ -34,10 +34,24 @@ class SQLRetriever:
         if not keywords:
             return []
 
+        # 3. Extract Year from query (e.g., "2022", "FY24")
+        import re
+        year_match = re.search(r'(?:20|FY)(\d{2})', query_text, re.IGNORECASE)
+        target_year = None
+        if year_match:
+            # Handle "22" -> 2022, "2022" -> 2022
+            y_str = year_match.group(1)
+            target_year = int("20" + y_str) if len(y_str) == 2 else int(y_str) # Regex limits to 2 digits right now
+            
+        full_year_match = re.search(r'\b(20\d{2})\b', query_text)
+        if full_year_match:
+            target_year = int(full_year_match.group(1))
+
         # Build dynamic OR clause for line items
         conditions = [FinancialLineItem.line_item_name.ilike(f"%{kw}%") for kw in keywords]
         
-        stmt = (
+        # Base query
+        base_query = (
             select(
                 FinancialLineItem.line_item_name,
                 FinancialLineItem.line_item_value,
@@ -53,9 +67,13 @@ class SQLRetriever:
                     or_(*conditions)
                 )
             )
-            .order_by(FinancialStatement.period_date.desc())
-            .limit(limit)
         )
+
+        # Apply Year Filter if detected
+        if target_year:
+            base_query = base_query.where(FinancialStatement.fiscal_year == target_year)
+        
+        stmt = base_query.order_by(FinancialStatement.period_date.desc()).limit(limit)
         
         results = await self.db.execute(stmt)
         
@@ -65,7 +83,7 @@ class SQLRetriever:
                 "source": "sql",
                 "line_item": row.line_item_name,
                 "value": float(row.line_item_value),
-                "period": f"FY{row.fiscal_year} Q{row.fiscal_quarter}" if row.fiscal_quarter else f"FY{row.fiscal_year}",
+                "period": f"FY{row.fiscal_year} (Annual)" if row.period_type == "annual" else (f"FY{row.fiscal_year} Q{row.fiscal_quarter}" if row.fiscal_quarter else f"FY{row.fiscal_year}"),
                 "statement": row.statement_type
             })
             

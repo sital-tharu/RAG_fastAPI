@@ -11,7 +11,7 @@ if sys.platform == "win32":
 
 async def main():
     ticker = "RELIANCE.NS"
-    query = "What is the Capital Expenditure for FY25?"
+    query = "What is the total revenue of Reliance Industries in the latest fiscal year?"
     
     print(f"--- Testing RAG Query for {ticker} ---")
     print(f"Query: {query}")
@@ -25,6 +25,8 @@ async def main():
             print("Testing SQL Retriever...")
             sql_data = await retriever.sql_retriever.retrieve_financial_data(ticker, query)
             print(f"SQL Result: Found {len(sql_data)} items")
+            for item in sql_data:
+                print(f"  - {item['line_item']} ({item['period']}, {item['statement']}) = {item['value']}")
             
             # Test Vector
             import sys
