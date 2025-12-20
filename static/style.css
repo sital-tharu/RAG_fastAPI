@@ -249,6 +249,33 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+.suggestion-chips {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.chip {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.chip:hover {
+    background: var(--accent-primary);
+    color: var(--bg-dark);
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
 .input-area .input-wrapper {
     display: flex;
     gap: 1rem;
