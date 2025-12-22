@@ -1,5 +1,5 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import hashlib
 import time
 import logging
@@ -25,7 +25,7 @@ class LLMService:
         self.chain = FINANCIAL_QA_PROMPT | self.llm
         
         # In-memory cache: {cache_key: (response, timestamp)}
-        self._cache: Dict[str, tuple[str, float]] = {}
+        self._cache: Dict[str, Tuple[str, float]] = {}
         self._cache_ttl = 3600  # 1 hour cache TTL
         self._cache_max_size = 1000  # Maximum cache entries
 
