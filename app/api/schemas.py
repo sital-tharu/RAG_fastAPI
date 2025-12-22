@@ -10,6 +10,8 @@ class IngestResponse(BaseModel):
     company: str
     statements: int
     chunks: int
+    calculated_ratios: Optional[int] = 0  # NEW: Number of ratios calculated
+    validation: Optional[Dict[str, Any]] = None  # NEW: Validation results
     message: Optional[str] = None
 
 # Query Schemas
