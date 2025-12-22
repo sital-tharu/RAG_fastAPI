@@ -26,6 +26,8 @@ async def ingest_company(request: IngestRequest, db: AsyncSession = Depends(get_
             company=result.get("company", "Unknown"),
             statements=result.get("statements", 0),
             chunks=result.get("chunks", 0),
+            calculated_ratios=result.get("calculated_ratios", 0),  # NEW
+            validation=result.get("validation"),  # NEW
             message="Successfully ingested financial data"
         )
     except HTTPException:
