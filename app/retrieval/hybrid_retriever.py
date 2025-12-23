@@ -26,16 +26,11 @@ class HybridRetriever:
             sql_results.extend(sql_data)
 
         # Vector Retrieval (for Factual or Hybrid)
-        # We skip vector search on Windows due to known stability issues with ChromaDB + Asyncio
-        import sys
-        if sys.platform == "win32":
-            vector_data = []
-        else:
-            vector_data = await vector_store.similarity_search(
-                query, 
-                n_results=5, 
-                filter={"ticker": ticker}
-            )
+        vector_data = await vector_store.similarity_search(
+            query, 
+            n_results=5, 
+            filter={"ticker": ticker}
+        )
         vector_results.extend(vector_data)
 
         return {

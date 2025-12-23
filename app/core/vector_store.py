@@ -27,11 +27,6 @@ class VectorStore:
 
     async def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
         """Add texts and metadata to the vector store (Non-blocking)"""
-        import sys
-        if sys.platform == "win32":
-            # Skip on Windows to avoid crashes in FastAPI
-            return
-
         if not texts:
             return
             
@@ -47,8 +42,7 @@ class VectorStore:
             )
         
         import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _add_sync)
+        await asyncio.to_thread(_add_sync)
 
     async def similarity_search(self, query: str, n_results: int = 5, filter: Dict = None) -> List[Dict]:
         """Search for similar documents (Non-blocking)"""
@@ -72,8 +66,7 @@ class VectorStore:
             return formatted_results
 
         import asyncio
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _search_sync)
+        return await asyncio.to_thread(_search_sync)
 
 # Global instance
 vector_store = VectorStore()
