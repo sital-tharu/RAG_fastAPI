@@ -1,6 +1,10 @@
 import sys
 import asyncio
 
+# Fix for Windows Asyncio "Event Loop is Closed" or Blocking issues
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 
 from fastapi import FastAPI
