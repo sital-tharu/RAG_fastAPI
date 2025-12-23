@@ -94,8 +94,8 @@ class VectorStore:
 
         import sys
         if sys.platform == "win32":
-             # Run synchronously on Windows
-             return _search_sync(query_embeddings)
+             # Skip on Windows to prevent server crash
+             return []
         else:
              return await asyncio.to_thread(_search_sync, query_embeddings)
 
