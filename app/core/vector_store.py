@@ -31,26 +31,47 @@ class VectorStore:
             return
             
         import uuid
+        import asyncio
         ids = [str(uuid.uuid4()) for _ in texts]
         
-        def _add_sync():
-            collection = self._get_collection_sync()
+        # 1. Generate embeddings explicitly (avoid passing model object to worker thread implicitly)
+        # Run inference in a thread
+        embeddings = await asyncio.to_thread(self.embedding_fn, texts)
+        
+        def _add_sync(embeddings_list):
+            import chromadb
+            client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
+            # Use None for embedding_function to prevent internal calls/state issues
+            collection = client.get_or_create_collection(
+                name="financial_data",
+                embedding_function=None 
+            )
             collection.add(
                 documents=texts,
                 metadatas=metadatas,
-                ids=ids
+                ids=ids,
+                embeddings=embeddings_list
             )
         
-        import asyncio
-        await asyncio.to_thread(_add_sync)
+        # 2. Add to ChromaDB in a thread
+        await asyncio.to_thread(_add_sync, embeddings)
 
     async def similarity_search(self, query: str, n_results: int = 5, filter: Dict = None) -> List[Dict]:
         """Search for similar documents (Non-blocking)"""
+        import asyncio
         
-        def _search_sync():
-            collection = self._get_collection_sync()
+        # 1. Generate query embedding
+        query_embeddings = await asyncio.to_thread(self.embedding_fn, [query])
+        
+        def _search_sync(q_embeds):
+            import chromadb
+            client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
+            collection = client.get_or_create_collection(
+                name="financial_data",
+                embedding_function=None
+            )
             results = collection.query(
-                query_texts=[query],
+                query_embeddings=q_embeds,
                 n_results=n_results,
                 where=filter
             )
@@ -65,8 +86,7 @@ class VectorStore:
                     })
             return formatted_results
 
-        import asyncio
-        return await asyncio.to_thread(_search_sync)
+        return await asyncio.to_thread(_search_sync, query_embeddings)
 
 # Global instance
 vector_store = VectorStore()
