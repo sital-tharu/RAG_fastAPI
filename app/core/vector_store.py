@@ -56,8 +56,9 @@ class VectorStore:
         # 2. Add to ChromaDB
         import sys
         if sys.platform == "win32":
-            # Run synchronously on Windows to prevent SQLite/Threading crashes
-            _add_sync(embeddings)
+            # Skip on Windows due to persistent instability/crashes with ChromaDB+SQLite
+            # blocking the event loop or causing segfaults during heavy writes.
+            return
         else:
             await asyncio.to_thread(_add_sync, embeddings)
 
