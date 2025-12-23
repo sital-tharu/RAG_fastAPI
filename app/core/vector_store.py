@@ -1,5 +1,7 @@
 import chromadb
 import sys
+print("DEBUG: VectorStore Loaded with sys support")
+
 from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
 from app.core.config import get_settings
@@ -92,7 +94,6 @@ class VectorStore:
                     })
             return formatted_results
 
-        import sys
         if sys.platform == "win32":
              # Skip on Windows to prevent server crash
              return []
