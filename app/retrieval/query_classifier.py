@@ -1,42 +1,70 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from app.core.config import get_settings
+
+settings = get_settings()
 
 class QueryType(Enum):
-    NUMERIC = "numeric"
-    FACTUAL = "factual"
-    HYBRID = "hybrid"
+    NUMERIC = "numeric"  # SQL Tables (Income, Balance, Ratios)
+    FACTUAL = "factual"  # Vector Store (Text, Risks, Strategy)
+    HYBRID = "hybrid"    # Both
+    GENERAL = "general"   # LLM Knowledge
+
+class ClassificationResult(BaseModel):
+    query_type: str = Field(description="The classified type: numeric, factual, hybrid, or general")
+    reasoning: str = Field(description="Brief reason for the classification")
 
 class QueryClassifier:
-    
-    NUMERIC_KEYWORDS = {
-        "growth", "increase", "decrease", "margin", "ratio", "profit", 
-        "revenue", "earnings", "net income", "sales", "turnover", 
-        "ebitda", "debt", "liability", "asset", "equity", "percent", "%",
-        "yoy", "qoq", "compare", "difference", "total", "sum"
-    }
-    
-    FACTUAL_KEYWORDS = {
-        "what is", "who is", "describe", "explain", "summary", "summarize",
-        "management", "risk", "competitor", "strategy", "outlook", "guidance",
-        "segment", "product", "service", "history", "founded", "ceo", "board"
-    }
+    def __init__(self):
+        # Use a lightweight fast model for classification
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash-exp", 
+            google_api_key=settings.GOOGLE_API_KEY,
+            temperature=0.0
+        )
+        
+        self.parser = JsonOutputParser(pydantic_object=ClassificationResult)
+        
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a financial query intent classifier.
+Analyze the user's question and classify it into one of the following categories:
 
-    def classify(self, query: str) -> QueryType:
-        """
-        Classifies the query into a QueryType based on keywords.
-        Simple heuristic approach.
-        """
-        query_lower = query.lower()
+1. **numeric**: Questions requiring specific financial constants, calculated ratios, or data from financial statements (e.g., "What is the revenue?", "Calculate P/E ratio", "Compare debt of X and Y").
+2. **factual**: Questions about qualitative aspects, business description, risks, management, strategy, or text-based info (e.g., "What does the company do?", "Who is the CEO?", "List the risk factors").
+3. **hybrid**: Questions requiring both numbers and context (e.g., "Why did revenue drop in 2023?").
+4. **general**: Questions not related to specific financial data or requiring RAG (e.g., "What is a stock market?", "Hi").
+
+Output JSON only.
+"""),
+            ("human", "{query}"),
+        ])
         
-        has_numeric = any(kw in query_lower for kw in self.NUMERIC_KEYWORDS)
-        has_factual = any(kw in query_lower for kw in self.FACTUAL_KEYWORDS)
-        
-        if has_numeric and has_factual:
-            return QueryType.HYBRID
-        elif has_numeric:
-            return QueryType.NUMERIC
-        elif has_factual:
-            return QueryType.FACTUAL
-        else:
-            # Default to Hybrid if unsure, to be safe
+        self.chain = self.prompt | self.llm | self.parser
+
+    async def classify(self, query: str) -> QueryType:
+        """
+        Classifies the query using LLM.
+        """
+        try:
+            # We use invoke (sync) wrapped in sync-to-async if needed, or if chain supports async invoke
+            # LangChain chains usually support ainvoke
+            result = await self.chain.ainvoke({"query": query})
+            
+            q_type_str = result.get("query_type", "hybrid").lower()
+            
+            if "numeric" in q_type_str:
+                return QueryType.NUMERIC
+            elif "factual" in q_type_str:
+                return QueryType.FACTUAL
+            elif "general" in q_type_str:
+                return QueryType.GENERAL
+            else:
+                return QueryType.HYBRID
+        except Exception as e:
+            print(f"Classifier Error: {e}")
+            # Fallback to Hybrid on error
             return QueryType.HYBRID
