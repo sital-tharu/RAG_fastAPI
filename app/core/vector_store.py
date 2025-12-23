@@ -1,6 +1,5 @@
 import chromadb
 import sys
-print("DEBUG: VectorStore Loaded with sys support")
 
 from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
