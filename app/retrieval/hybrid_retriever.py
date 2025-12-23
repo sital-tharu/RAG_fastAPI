@@ -15,7 +15,7 @@ class HybridRetriever:
         """
         Perform hybrid retrieval based on query type.
         """
-        query_type = self.classifier.classify(query)
+        query_type = await self.classifier.classify(query)
         
         sql_results = []
         vector_results = []
@@ -26,12 +26,13 @@ class HybridRetriever:
             sql_results.extend(sql_data)
 
         # Vector Retrieval (for Factual or Hybrid)
-        vector_data = await vector_store.similarity_search(
-            query, 
-            n_results=5, 
-            filter={"ticker": ticker}
-        )
-        vector_results.extend(vector_data)
+        if query_type in [QueryType.FACTUAL, QueryType.HYBRID]:
+            vector_data = await vector_store.similarity_search(
+                query, 
+                n_results=5, 
+                filter={"ticker": ticker}
+            )
+            vector_results.extend(vector_data)
 
         return {
             "query_type": query_type.value,
