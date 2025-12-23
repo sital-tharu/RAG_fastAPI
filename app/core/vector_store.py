@@ -53,8 +53,13 @@ class VectorStore:
                 embeddings=embeddings_list
             )
         
-        # 2. Add to ChromaDB in a thread
-        await asyncio.to_thread(_add_sync, embeddings)
+        # 2. Add to ChromaDB
+        import sys
+        if sys.platform == "win32":
+            # Run synchronously on Windows to prevent SQLite/Threading crashes
+            _add_sync(embeddings)
+        else:
+            await asyncio.to_thread(_add_sync, embeddings)
 
     async def similarity_search(self, query: str, n_results: int = 5, filter: Dict = None) -> List[Dict]:
         """Search for similar documents (Non-blocking)"""
@@ -86,7 +91,11 @@ class VectorStore:
                     })
             return formatted_results
 
-        return await asyncio.to_thread(_search_sync, query_embeddings)
+        if sys.platform == "win32":
+             # Run synchronously on Windows
+             return _search_sync(query_embeddings)
+        else:
+             return await asyncio.to_thread(_search_sync, query_embeddings)
 
 # Global instance
 vector_store = VectorStore()
