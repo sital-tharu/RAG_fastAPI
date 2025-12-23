@@ -55,7 +55,6 @@ class VectorStore:
             )
         
         # 2. Add to ChromaDB
-        import sys
         if sys.platform == "win32":
             # Skip on Windows due to persistent instability/crashes with ChromaDB+SQLite
             # blocking the event loop or causing segfaults during heavy writes.
@@ -93,6 +92,7 @@ class VectorStore:
                     })
             return formatted_results
 
+        import sys
         if sys.platform == "win32":
              # Run synchronously on Windows
              return _search_sync(query_embeddings)
