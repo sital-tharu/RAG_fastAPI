@@ -1,81 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial RAG Agent</title>
-    <!-- Google Fonts for Premium Typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap"
-        rel="stylesheet">
+    <title>Financial RAG - Premium Intelligence</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- Sidebar: Controls & Ingestion -->
         <aside class="sidebar">
-            <div class="brand">
-                <div class="logo-icon">F</div>
-                <h1>Financial RAG</h1>
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <span>FinRAG <span style="color:var(--accent)">AI</span></span>
             </div>
 
-            <div class="control-panel">
+            <div class="ingest-panel">
+                <h3>Ingest Company</h3>
+                <p style="font-size: 0.8rem; margin-bottom: 0.75rem;">Enter stock ticker (e.g., INFY.NS)</p>
                 <div class="input-group">
-                    <label>COMPANY TICKER</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="tickerInput" placeholder="e.g. RELIANCE.NS">
-                    </div>
+                    <input type="text" id="tickerInput" placeholder="Ticker..." maxlength="10">
+                    <button id="ingestBtn" onclick="ingestCompany()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
                 </div>
-
-                <button id="ingestBtn" class="premium-btn">
-                    <span class="btn-text">Ingest Data</span>
-                    <div class="btn-shine"></div>
-                </button>
-
-                <div id="ingestStatus" class="status-indicator">Ready</div>
+                <div id="ingestStatus" style="margin-top: 1rem; min-height: 20px;"></div>
             </div>
 
-            <div class="info-panel">
-                <h3>Capabilities</h3>
-                <ul>
-                    <li>Balance Sheets</li>
-                    <li>Income Statements</li>
-                    <li>Cash Flow Analysis</li>
-                    <li>Ratios & Margins</li>
-                </ul>
+            <div style="flex: 1;"></div>
+            
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                Status: <span class="status-pill status-success">System Online</span>
             </div>
         </aside>
 
         <!-- Main Chat Area -->
-        <main class="chat-interface">
+        <main class="chat-area">
             <header class="chat-header">
-                <h2>Financial Analysis Assistant</h2>
-                <div class="model-badge">Gemini-2.5-Flash</div>
+                <div>
+                    <h2>Financial Intelligence</h2>
+                    <p>Ask about Revenue, Strategy, or Risks</p>
+                </div>
+                <div>
+                    <!-- Optional: Model Toggle or Options -->
+                </div>
             </header>
 
-            <div id="chatContainer" class="chat-history">
-                <div class="message bot-message">
+            <div id="messages" class="messages-container">
+                <!-- Welcome Message -->
+                <div class="message ai">
                     <div class="avatar">AI</div>
-                    <div class="message-content">
-                        Hello! I am your Financial RAG Agent. I can analyze financial statements for Indian companies.
-                        <br><br>
-                        <strong>How to start:</strong><br>
-                        1. Enter a ticker (e.g., RELIANCE.NS) and click <em>Ingest Data</em>.<br>
-                        2. Ask me about Revenue, Margins, or Capex.
+                    <div class="bubble">
+                        Hello! I'm your Financial Analyst assistant. Any company you ingest, I can analyze. Try asking:
+                        <ul>
+                            <li>"What is the revenue for INFY.NS?" (Numeric)</li>
+                            <li>"What are the key risks?" (Factual)</li>
+                        </ul>
                     </div>
                 </div>
             </div>
 
             <div class="input-area">
-                <div class="input-wrapper">
-                    <textarea id="queryInput" placeholder="Ask about revenue, capex, or margins..." rows="1"></textarea>
-                    <button id="sendBtn" class="send-btn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
+                <div class="input-container">
+                    <textarea id="queryInput" rows="1" placeholder="Ask a question..." onkeydown="handleKey(event)"></textarea>
+                    <button class="send-btn" onclick="sendQuery()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                         </svg>
@@ -85,8 +80,6 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="/static/script.js"></script>
 </body>
-
 </html>
