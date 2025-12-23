@@ -94,6 +94,7 @@ class VectorStore:
                     })
             return formatted_results
 
+        import sys
         if sys.platform == "win32":
              # Skip on Windows to prevent server crash
              return []
