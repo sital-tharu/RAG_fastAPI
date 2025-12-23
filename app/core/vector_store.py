@@ -1,4 +1,5 @@
 import chromadb
+import sys
 from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
 from app.core.config import get_settings
