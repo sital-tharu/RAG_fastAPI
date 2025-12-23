@@ -8,22 +8,21 @@ settings = get_settings()
 
 class VectorStore:
     def __init__(self):
-        # We generally don't initialize PersistentClient here to avoid
-        # "SQLite objects created in a thread can only be used in that same thread"
-        # when running in run_in_executor.
         self.settings = settings
         self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name=self.settings.EMBEDDING_MODEL
         )
-
-    def _get_collection_sync(self):
-        """Helper to get collection in the current thread context"""
+        # Initialize client once to avoid overhead and file lock issues
         import chromadb
-        client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
-        return client.get_or_create_collection(
+        self.client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
+        self.collection = self.client.get_or_create_collection(
             name="financial_data",
             embedding_function=self.embedding_fn
         )
+
+    def _get_collection_sync(self):
+        """Helper to get collection (now just returns cached instance)"""
+        return self.collection
 
     async def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
         """Add texts and metadata to the vector store (Non-blocking)"""
