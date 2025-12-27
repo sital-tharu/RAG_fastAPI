@@ -2,6 +2,10 @@ from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 class Settings(BaseSettings):
     # Application
@@ -13,7 +17,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     
     # Google Gemini
-    GOOGLE_API_KEY: str
+
 
     # Groq
 
