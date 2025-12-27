@@ -3,6 +3,8 @@ from typing import Dict, Optional, Tuple
 import hashlib
 import time
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from google.api_core.exceptions import ResourceExhausted
 
 from app.core.config import get_settings
 from app.llm.prompt_templates import FINANCIAL_QA_PROMPT
@@ -16,7 +18,7 @@ class LLMService:
         # Initialize Google Gemini
         # Temperature 0 for maximum factuality
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=0.0
         )
@@ -82,6 +84,14 @@ class LLMService:
         self._cache[cache_key] = (response, time.time())
         logger.debug(f"Cached response for key: {cache_key[:8]}...")
 
+    @retry(
+        retry=retry_if_exception_type(ResourceExhausted),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    async def _execute_chain(self, inputs: Dict):
+        return await self.chain.ainvoke(inputs)
+
     async def generate_answer(self, question: str, context: str) -> str:
         """
         Generate answer from LLM based on context.
@@ -107,7 +117,7 @@ class LLMService:
         try:
             # invoke chain with input dict
             logger.info(f"Calling LLM for new query (cache miss)")
-            response = await self.chain.ainvoke({
+            response = await self._execute_chain({
                 "question": question,
                 "context": context
             })
