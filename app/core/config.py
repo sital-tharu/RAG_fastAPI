@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     
     # Google Gemini
     GOOGLE_API_KEY: str
+
+    # Groq
+
+    groq_api_key: str
     
     # Vector Store
     VECTOR_STORE_TYPE: str = "chroma"
@@ -25,6 +29,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 @lru_cache()
 def get_settings() -> Settings:

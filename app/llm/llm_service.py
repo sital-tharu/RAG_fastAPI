@@ -1,10 +1,10 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from typing import Dict, Optional, Tuple
 import hashlib
 import time
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from google.api_core.exceptions import ResourceExhausted
+# from google.api_core.exceptions import ResourceExhausted
 
 from app.core.config import get_settings
 from app.llm.prompt_templates import FINANCIAL_QA_PROMPT
@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
-        # Initialize Google Gemini
+        # Initialize Groq
         # Temperature 0 for maximum factuality
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=settings.GOOGLE_API_KEY,
+        self.llm = ChatGroq(
+            model="llama-3.1-8b-instant",
+            api_key=settings.groq_api_key,
             temperature=0.0
         )
         
@@ -85,7 +85,7 @@ class LLMService:
         logger.debug(f"Cached response for key: {cache_key[:8]}...")
 
     @retry(
-        retry=retry_if_exception_type(ResourceExhausted),
+        retry=retry_if_exception_type(Exception),
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )

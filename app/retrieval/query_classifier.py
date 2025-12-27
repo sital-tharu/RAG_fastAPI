@@ -1,12 +1,12 @@
 from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from app.core.config import get_settings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from google.api_core.exceptions import ResourceExhausted
+# from google.api_core.exceptions import ResourceExhausted
 
 settings = get_settings()
 
@@ -23,9 +23,9 @@ class ClassificationResult(BaseModel):
 class QueryClassifier:
     def __init__(self):
         # Use a lightweight fast model for classification
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash", 
-            google_api_key=settings.GOOGLE_API_KEY,
+        self.llm = ChatGroq(
+            model="llama-3.1-8b-instant", 
+            api_key=settings.groq_api_key,
             temperature=0.0
         )
         
@@ -48,7 +48,7 @@ Output JSON only.
         self.chain = self.prompt | self.llm | self.parser
 
     @retry(
-        retry=retry_if_exception_type(ResourceExhausted),
+        retry=retry_if_exception_type(Exception), # Groq might raise different errors, general retry for now + specific
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )
