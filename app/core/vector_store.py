@@ -1,8 +1,4 @@
-import chromadb
 import sys
-
-from chromadb.config import Settings as ChromaSettings
-from chromadb.utils import embedding_functions
 from app.core.config import get_settings
 from typing import List, Dict, Any
 
@@ -20,6 +16,7 @@ class VectorStore:
         
         # Only load heavy embedding model if NOT on cloud
         if not self.is_cloud:
+            from chromadb.utils import embedding_functions  # Lazy import
             self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=self.settings.EMBEDDING_MODEL
             )
