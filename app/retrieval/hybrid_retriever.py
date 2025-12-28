@@ -15,18 +15,21 @@ class HybridRetriever:
         """
         Perform hybrid retrieval based on query type.
         """
+        print(f"DEBUG: [HybridRetriever] Starting retrieval for ticker={ticker}, query='{query}'", flush=True)
         query_type = await self.classifier.classify(query)
+        print(f"DEBUG: [HybridRetriever] Classification Result: {query_type}", flush=True)
         
         sql_results = []
         vector_results = []
         
-        print(f"DEBUG: Query Classification: {query_type}")
+        print(f"DEBUG: [HybridRetriever] Starting SQL Retrieval...", flush=True)
         
         # SQL Retrieval (for Numeric or Hybrid)
         if query_type in [QueryType.NUMERIC, QueryType.HYBRID]:
             # Reduced limit to 60 to ensure high relevance and fit in context
             sql_data = await self.sql_retriever.retrieve_financial_data(ticker, query, limit=60)
-            print(f"DEBUG: SQL Retriever found {len(sql_data)} items")
+            print(f"DEBUG: [HybridRetriever] SQL Retrieval done. Found {len(sql_data)} items.", flush=True)
+            print(f"DEBUG: [HybridRetriever] SQL Retriever found {len(sql_data)} items")
             
             # Print breakdown of items found
             item_names = [d['line_item'] for d in sql_data]
@@ -40,6 +43,7 @@ class HybridRetriever:
 
         # Vector Retrieval (for Factual or Hybrid)
         if query_type in [QueryType.FACTUAL, QueryType.HYBRID]:
+            print(f"DEBUG: [HybridRetriever] Starting Vector Retrieval...", flush=True)
             vector_data = await vector_store.similarity_search(
                 query, 
                 n_results=5, 

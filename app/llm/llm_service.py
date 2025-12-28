@@ -117,10 +117,12 @@ class LLMService:
         try:
             # invoke chain with input dict
             logger.info(f"Calling LLM for new query (cache miss)")
+            print(f"DEBUG: [LLMService] invoking chain for query: {question[:50]}...", flush=True)
             response = await self._execute_chain({
                 "question": question,
                 "context": context
             })
+            print(f"DEBUG: [LLMService] Chain invocation complete. Response received.", flush=True)
             # ChatGoogleGenerativeAI returns an AIMessage, we need the content
             answer = response.content
             

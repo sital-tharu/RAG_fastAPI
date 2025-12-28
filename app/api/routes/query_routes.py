@@ -13,6 +13,7 @@ async def query_financials(request: QueryRequest, db: AsyncSession = Depends(get
     Answer natural language questions about a company's financials.
     Uses Hybrid RAG (SQL + Vector) + Gemini LLM.
     """
+    print(f"DEBUG: [QueryRoute] Received request: {request}", flush=True)
     try:
         # 1. Retrieve Context
         retriever = HybridRetriever(db)
