@@ -56,9 +56,10 @@ class VectorStore:
             )
         
         # 2. Add to ChromaDB
-        if sys.platform == "win32":
-            # Skip on Windows due to persistent instability/crashes with ChromaDB+SQLite
-            # blocking the event loop or causing segfaults during heavy writes.
+        import os
+        is_cloud = sys.platform == "win32" or os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT")
+        if is_cloud:
+            # Skip on cloud platforms (ChromaDB requires persistent filesystem)
             return
         else:
             await asyncio.to_thread(_add_sync, embeddings)
@@ -93,9 +94,10 @@ class VectorStore:
                     })
             return formatted_results
 
-        import sys
-        if sys.platform == "win32":
-             # Skip on Windows to prevent server crash
+        import os
+        is_cloud = sys.platform == "win32" or os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT")
+        if is_cloud:
+             # Skip on cloud to prevent crashes
              return []
         else:
              return await asyncio.to_thread(_search_sync, query_embeddings)
