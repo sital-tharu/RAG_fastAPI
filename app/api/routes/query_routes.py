@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.retrieval.hybrid_retriever import HybridRetriever
-from app.llm.llm_service import LLMService
+from app.llm.llm_service import llm_service
 from app.api.schemas import QueryRequest, QueryResponse
 
 router = APIRouter()
@@ -22,9 +22,10 @@ async def query_financials(request: QueryRequest, db: AsyncSession = Depends(get
         context_str = retrieval_result["context_str"]
         query_type = retrieval_result["query_type"]
         
+        
         # 2. Generate Answer
-        llm = LLMService()
-        answer = await llm.generate_answer(request.query, context_str)
+        # Use singleton instance
+        answer = await llm_service.generate_answer(request.query, context_str)
         
         # 3. Format Response
         # Merge sources for citation

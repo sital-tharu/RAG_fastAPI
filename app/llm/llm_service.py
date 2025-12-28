@@ -156,3 +156,6 @@ class LLMService:
             "cache_max_size": self._cache_max_size,
             "cache_ttl_seconds": self._cache_ttl
         }
+
+# Global Singleton Instance
+llm_service = LLMService()

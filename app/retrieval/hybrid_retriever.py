@@ -1,13 +1,14 @@
 from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.retrieval.query_classifier import QueryClassifier, QueryType
+from app.retrieval.query_classifier import query_classifier, QueryType
 from app.retrieval.sql_retriever import SQLRetriever
 from app.core.vector_store import vector_store
 
 class HybridRetriever:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.classifier = QueryClassifier()
+        # Use singleton
+        self.classifier = query_classifier
         self.sql_retriever = SQLRetriever(db)
         # Vector store matches implicit global instance or can be passed locally logic
 
@@ -26,8 +27,8 @@ class HybridRetriever:
         
         # SQL Retrieval (for Numeric or Hybrid)
         if query_type in [QueryType.NUMERIC, QueryType.HYBRID]:
-            # Reduced limit to 60 to ensure high relevance and fit in context
-            sql_data = await self.sql_retriever.retrieve_financial_data(ticker, query, limit=60)
+            # Reduced limit to 30 to prevent OOM on Render Free Tier
+            sql_data = await self.sql_retriever.retrieve_financial_data(ticker, query, limit=30)
             print(f"DEBUG: [HybridRetriever] SQL Retrieval done. Found {len(sql_data)} items.", flush=True)
             print(f"DEBUG: [HybridRetriever] SQL Retriever found {len(sql_data)} items")
             
