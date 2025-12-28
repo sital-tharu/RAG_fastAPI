@@ -74,6 +74,7 @@ Output JSON only.
                 return QueryType.GENERAL
             else:
                 return QueryType.HYBRID
+        except Exception as e:
             print(f"Classifier Error: {e}")
             # Fallback to Hybrid on error
             return QueryType.HYBRID
