@@ -1,518 +1,468 @@
-# Financial RAG System - Technical Documentation
+# Financial RAG System — Technical Documentation
+
+> **Audience**: Final-year CS/IT students and engineers familiar with basic Python, APIs, and databases.  
+> **Last Updated**: December 2024
+
+---
 
 ## Table of Contents
-1. [System Overview](#system-overview)
-2. [Architecture](#architecture)
-3. [Ingestion Pipeline](#ingestion-pipeline)
-4. [Data Processing](#data-processing)
-5. [Retrieval Logic](#retrieval-logic)
-6. [Challenges Solved](#challenges-solved)
-7. [Verification & Testing](#verification--testing)
-8. [Deployment Considerations](#deployment-considerations)
+1. [Introduction](#1-introduction)
+2. [System Architecture](#2-system-architecture)
+3. [Technologies and Models](#3-technologies-and-models)
+4. [RAG Pipeline](#4-rag-pipeline)
+5. [Reliability and Rate-Limiting Handling](#5-reliability-and-rate-limiting-handling)
+6. [Financial Data Use Case (INFY.NS Example)](#6-financial-data-use-case-infyns-example)
+7. [Evaluation and Limitations](#7-evaluation-and-limitations)
+8. [Conclusion](#8-conclusion)
 
 ---
 
-## System Overview
+## 1. Introduction
 
-The Financial RAG (Retrieval-Augmented Generation) system is a production-grade AI assistant designed to analyze financial statements of Indian public companies (NSE/BSE). It combines structured SQL retrieval with semantic vector search to provide accurate, citation-backed financial insights.
+### 1.1 Problem Statement
 
-**Core Technologies:**
-- **Backend Framework**: FastAPI (async Python web framework)
-- **Database**: PostgreSQL (structured financial data storage)
-- **Vector Store**: ChromaDB (semantic embeddings)
-- **LLM**: Google Gemini 2.5 Flash (via LangChain)
-- **Data Source**: Yahoo Finance API (`yfinance`)
+Analyzing publicly traded companies requires navigating dense financial statements—Income Statements, Balance Sheets, and Cash Flow Statements—across multiple fiscal years and quarters. Traditional methods (spreadsheets, manual lookups) are slow, error-prone, and inaccessible to non-experts.
 
-**Key Features:**
-- Historical data access (FY2021-FY2025, Annual & Quarterly)
-- Strict governance (zero hallucinations, mandatory citations)
-- Multi-statement support (Income, Balance Sheet, Cash Flow)
-- Metadata-based filtering (ticker, fiscal year, period type)
+Large Language Models (LLMs) can summarize and explain complex data, but they suffer from a critical flaw: **hallucination**. An LLM might confidently fabricate revenue figures or invent ratios that don't exist in any source document.
 
----
+### 1.2 Motivation
 
-## Architecture
+This project addresses two key challenges:
 
-### High-Level Flow
-```
-User Query → FastAPI → HybridRetriever → [SQL + Vector Search] → Context Builder → Gemini LLM → Response
-```
+1. **Data Retrieval**: How do we programmatically fetch, normalize, and store structured financial data from public sources?
+2. **Grounded Generation**: How do we leverage LLMs to answer questions while strictly preventing fabrication?
 
-### Component Diagram
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Web UI (HTML/CSS/JS)                 │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│              FastAPI Application (main.py)              │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  API Routes (/ingest, /query, /health)          │   │
-│  └──────────────────┬───────────────────────────────┘   │
-└───────────────────┬─┴─────────────────────────────────┬─┘
-                    │                                   │
-        ┌───────────▼─────────────┐     ┌──────────────▼────────────┐
-        │  Ingestion Service      │     │  HybridRetriever          │
-        │  ┌──────────────────┐   │     │  ┌─────────────────────┐  │
-        │  │ YahooFinance     │   │     │  │ QueryClassifier     │  │
-        │  │ Fetcher          │   │     │  │ (Numeric/Factual)   │  │
-        │  └──────┬───────────┘   │     │  └──────┬──────────────┘  │
-        │  ┌──────▼───────────┐   │     │  ┌──────▼──────────────┐  │
-        │  │ DataNormalizer   │   │     │  │ SQLRetriever        │  │
-        │  │ (Chunking)       │   │     │  │ (Metadata Filter)   │  │
-        │  └──────┬───────────┘   │     │  └──────┬──────────────┘  │
-        └─────────┼───────────────┘     │  ┌──────▼──────────────┐  │
-                  │                     │  │ VectorStore         │  │
-        ┌─────────▼───────────────┐     │  │ (ChromaDB)          │  │
-        │  PostgreSQL Database    │     │  └─────────────────────┘  │
-        │  ┌──────────────────┐   │     └───────────┬────────────────┘
-        │  │ Companies        │   │                 │
-        │  │ Statements       │◄──┼─────────────────┘
-        │  │ LineItems        │   │
-        │  └──────────────────┘   │     ┌──────────────────────────┐
-        └──────────────────────────┘     │  LLM Service (Gemini)    │
-                                        │  ┌────────────────────┐  │
-                                        │  │ Prompt Template    │  │
-                                        │  │ (Strict Rules)     │  │
-                                        │  └────────────────────┘  │
-                                        └──────────────────────────┘
-```
+The answer is **Retrieval-Augmented Generation (RAG)**—a hybrid approach where the LLM is given *only* the relevant retrieved data, and is instructed to refuse answers if sufficient data is unavailable.
+
+### 1.3 High-Level Features
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Statement Support** | Income Statement, Balance Sheet, Cash Flow Statement (Annual & Quarterly) |
+| **Temporal Awareness** | Supports queries like "Revenue in FY2022" or "Q3 2024 profit" |
+| **Strict Governance** | Zero hallucinations—mandatory citations, refusal on missing data |
+| **Hybrid Retrieval** | SQL (for exact numbers) + Vector Search (for semantic matching) |
+| **Rate-Limit Resilience** | Graceful handling of API throttling with retries and fallbacks |
 
 ---
 
-## Ingestion Pipeline
+## 2. System Architecture
 
-### 1. Data Fetching (`app/ingestion/data_fetchers.py`)
+### 2.1 Overall Architecture Diagram
 
-**YahooFinanceFetcher** pulls financial data from Yahoo Finance using NSE/BSE tickers:
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              WEB UI (HTML/CSS/JS)                       │
+│                          [http://localhost:8000]                        │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │ HTTP POST /api/v1/query
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FastAPI Application                             │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │  1. API Routes: /ingest/company, /query/, /health/               │  │
+│  │  2. Dependency Injection: Database Session (AsyncSession)        │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────┐
+│ IngestionService│      │  HybridRetriever    │      │   LLMService    │
+│  (Data Pipeline)│      │  (Query Routing)    │      │  (Answer Gen)   │
+└────────┬────────┘      └──────────┬──────────┘      └────────┬────────┘
+         │                          │                          │
+         ▼                          ▼                          ▼
+┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────┐
+│ Yahoo Finance   │      │ QueryClassifier     │      │  Groq LLM API   │
+│ (yfinance lib)  │      │ (Numeric/Factual)   │      │ (llama-3.1-8b)  │
+└─────────────────┘      └──────────┬──────────┘      └─────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+           ┌─────────────────┐             ┌─────────────────┐
+           │  SQLRetriever   │             │  VectorStore    │
+           │  (PostgreSQL)   │             │  (ChromaDB)     │
+           └─────────────────┘             └─────────────────┘
+```
+
+### 2.2 Component Responsibilities
+
+| Component | File(s) | Responsibility |
+|-----------|---------|----------------|
+| **Web UI** | `static/index.html, script.js, style.css` | User interface for ingestion and querying |
+| **FastAPI App** | `app/main.py`, `app/api/routes/` | HTTP routing, request validation |
+| **Ingestion Service** | `app/ingestion/*.py` | Fetch → Normalize → Store pipeline |
+| **Hybrid Retriever** | `app/retrieval/hybrid_retriever.py` | Routes queries to SQL or Vector retriever |
+| **Query Classifier** | `app/retrieval/query_classifier.py` | LLM-based classification (Numeric/Factual/Hybrid) |
+| **SQL Retriever** | `app/retrieval/sql_retriever.py` | Keyword + year-based SQL queries |
+| **Vector Store** | `app/core/vector_store.py` | ChromaDB wrapper for semantic search |
+| **LLM Service** | `app/llm/llm_service.py` | Groq API integration with strict prompting |
+| **Prompt Templates** | `app/llm/prompt_templates.py` | Anti-hallucination governance rules |
+
+### 2.3 Data Flow: Query to Answer
+
+1. **User Query**: "What is the revenue for INFY.NS?"
+2. **FastAPI** receives the request at `/api/v1/query/`
+3. **QueryClassifier** uses a lightweight LLM call to classify: → `NUMERIC`
+4. **HybridRetriever** routes to **SQLRetriever** (since it's numeric)
+5. **SQLRetriever** queries PostgreSQL:
+   - Extracts keywords: `["revenue", "sales", "turnover", "income", "earnings", "infy"]`
+   - Finds matching `FinancialLineItem` rows (e.g., "Total Revenue", "Operating Revenue")
+6. **Context Builder** formats results:
+   ```
+   === STRUCTURED FINANCIAL DATA (High Confidence) ===
+   - Operating Revenue: 5,076,000,000.0 (FY2025 Q3, income_statement)
+   - Total Revenue: 5,076,000,000.0 (FY2025 Q3, income_statement)
+   ```
+7. **LLMService** invokes Groq with the context and strict prompt
+8. **Response**: "The Operating Revenue for INFY.NS in FY2025 Q3 is ₹5,076,000,000. [Source: FY2025 Q3, Income Statement]"
+
+---
+
+## 3. Technologies and Models
+
+### 3.1 Technology Stack
+
+| Layer | Technology | Why This Choice |
+|-------|------------|-----------------|
+| **Language** | Python 3.10+ | Mature ecosystem for ML/AI, async support |
+| **Web Framework** | FastAPI | High performance, native async, auto-docs |
+| **Database** | PostgreSQL + SQLAlchemy | Robust relational DB, async support via `asyncpg` |
+| **Vector Store** | ChromaDB | Lightweight, embedded, works locally |
+| **LLM Provider** | Groq API | Blazing-fast inference (14k requests/day free tier) |
+| **Data Source** | Yahoo Finance (`yfinance`) | Free, comprehensive financial data |
+| **Retry Logic** | Tenacity | Production-grade retry with exponential backoff |
+
+### 3.2 LLM Models
+
+| Purpose | Model | Rationale |
+|---------|-------|-----------|
+| **Query Classification** | `llama-3.1-8b-instant` | Fast, cheap, sufficient for simple classification |
+| **Answer Generation** | `llama-3.1-8b-instant` | Good balance of speed, accuracy, and rate limits |
+
+**Why Groq over OpenAI/Gemini?**
+- **Speed**: Groq uses custom LPU hardware, delivering near-instant responses
+- **Cost**: Free tier allows 14,400 requests/day (vs ~1,000 for larger models)
+- **Rate Limits**: The 8B model is much less likely to hit rate limits
+
+**Design Decision**: We initially used `llama-3.3-70b-versatile` but switched to `llama-3.1-8b-instant` after encountering frequent 429 (Rate Limit) errors on the free tier.
+
+### 3.3 Embedding Model
+
+| Component | Model | Dimensions |
+|-----------|-------|------------|
+| **ChromaDB** | `sentence-transformers/all-MiniLM-L6-v2` | 384 |
+
+This model is compact, fast, and suitable for semantic similarity over short text chunks.
+
+---
+
+## 4. RAG Pipeline
+
+### 4.1 Step-by-Step Flow
+
+```
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│ User Query    │───▶│ Query         │───▶│ Retrieval     │───▶│ Context       │───▶│ LLM           │
+│               │    │ Understanding │    │ (SQL/Vector)  │    │ Construction  │    │ Generation    │
+└───────────────┘    └───────────────┘    └───────────────┘    └───────────────┘    └───────────────┘
+     "Revenue?"         NUMERIC              SQL Query           Formatted          "Revenue is X"
+                        Classification       Results             Context String     + Citation
+```
+
+### 4.2 Query Understanding (Classification)
+
+The **QueryClassifier** uses the LLM to categorize queries:
+
+| Type | Example | Retrieval Strategy |
+|------|---------|-------------------|
+| `NUMERIC` | "What is the revenue?" | SQL only |
+| `FACTUAL` | "What does the company do?" | Vector only |
+| `HYBRID` | "Why did profit drop?" | SQL + Vector |
+| `GENERAL` | "What is a stock?" | LLM knowledge (no retrieval) |
+
+**Implementation** (`app/retrieval/query_classifier.py`):
+```python
+self.prompt = ChatPromptTemplate.from_messages([
+    ("system", """Classify the query into: numeric, factual, hybrid, or general.
+    Output JSON: {"query_type": "...", "reasoning": "..."}"""),
+    ("human", "{query}"),
+])
+```
+
+### 4.3 Retrieval
+
+#### SQL Retrieval (Structured Data)
+
+**Keyword Extraction**: The query is parsed to extract financial terms using a synonym mapping:
 
 ```python
-async def fetch_financials(self, ticker: str) -> Dict[str, Any]:
-    # Runs yfinance in a separate thread to avoid blocking async loop
-    return await asyncio.to_thread(self._fetch_sync, ticker)
-```
-
-**Data Retrieved:**
-- **Balance Sheets** (Annual + Quarterly): `stock.balance_sheet`, `stock.quarterly_balance_sheet`
-- **Income Statements** (Annual + Quarterly): `stock.income_stmt`, `stock.quarterly_income_stmt`
-- **Cash Flow Statements** (Annual + Quarterly): `stock.cashflow`, `stock.quarterly_cashflow`
-- **Company Metadata**: `stock.info` (name, sector, industry)
-
-**Output Format:**
-```python
-{
-    "info": {...},
-    "balance_sheet": {"annual": {...}, "quarterly": {...}},
-    "income_statement": {"annual": {...}, "quarterly": {...}},
-    "cash_flow": {"annual": {...}, "quarterly": {...}}
+self.financial_term_mappings = {
+    "revenue": ["revenue", "sales", "turnover", "income", "earnings"],
+    "profit": ["profit", "income", "earnings", "pbt", "pat"],
+    "assets": ["assets", "asset"],
+    "liabilities": ["liabilities", "liability", "debt"],
+    "capex": ["capital expenditure", "capex", "capital spending"],
+    # ... more mappings
 }
 ```
 
-### 2. Data Normalization (`app/ingestion/data_normalizer.py`)
+**Year Extraction**: Regex patterns find fiscal years:
+- `FY22`, `FY 2022` → 2022
+- `2023`, `2024` → Exact year
 
-**DataNormalizer** converts raw pandas DataFrames into structured `StandardizedFinancials` objects:
-
-**Normalization Steps:**
-1. **Parse Dates**: Extract `period_date` from DataFrame column headers
-2. **Extract Line Items**: Convert index (row labels) into `LineItem(name, value)` pairs
-3. **Calculate Fiscal Metadata**: Derive `fiscal_year` and `fiscal_quarter`
-4. **Filter Invalid Data**: Skip `None` values and non-numeric entries
-
-**Output Schema:**
-```python
-class StandardizedFinancials:
-    statement_type: str        # "balance_sheet" | "income_statement" | "cash_flow"
-    period_type: str           # "annual" | "quarterly"
-    period_date: datetime
-    fiscal_year: int
-    fiscal_quarter: Optional[int]
-    line_items: List[LineItem]
-    raw_data: Dict
-```
-
-### 3. Database Persistence (`app/ingestion/ingestion_service.py`)
-
-**IngestionService** orchestrates the full pipeline:
-
-1. **Fetch** → `YahooFinanceFetcher.fetch_financials(ticker)`
-2. **Normalize** → `DataNormalizer.normalize(raw_data)`
-3. **Store in PostgreSQL**:
-   - **Companies Table**: Upsert company metadata (ticker, name, sector)
-   - **FinancialStatements Table**: Insert statements with unique constraint:
-     ```sql
-     CONSTRAINT uq_company_statement_period UNIQUE (company_id, statement_type, period_type, period_date)
-     ```
-   - **FinancialLineItems Table**: Insert line items with unique constraint:
-     ```sql
-     CONSTRAINT uq_statement_line_item UNIQUE (statement_id, line_item_name)
-     ```
-4. **Prepare Vector Chunks**: For each line item, create a formatted text chunk:
-   ```
-   Company: Reliance Industries (RELIANCE.NS)
-   Period: 2023-03-31 (annual)
-   Statement: income_statement
-   Line Item: Total Revenue
-   Value: 6,959,630,000,000.00
-   ```
-5. **Store in ChromaDB**: `vector_store.add_texts(chunks, metadatas)`
-
-**Metadata Schema:**
-```python
-{
-    "company_id": int,
-    "ticker": str,
-    "statement_type": str,
-    "period_type": str,
-    "period_date": str (ISO format),
-    "line_item": str,
-    "numeric_value": float
-}
-```
-
----
-
-## Data Processing
-
-### Chunking Strategy
-
-**Challenge**: Financial statements are tabular (columns = dates, rows = line items). Traditional text chunking would destroy this structure.
-
-**Solution**: **Per-Line-Item Chunking**
-- Each financial line item (e.g., "Total Revenue") becomes a single chunk
-- Preserves context (company, date, statement type) within each chunk
-- Enables precise retrieval: "Revenue for FY2022" matches the exact chunk
-
-**Advantages:**
-1. **Granular Retrieval**: Query "What is CapEx?" retrieves only CapEx-related chunks
-2. **Metadata Filtering**: Filter by ticker (prevent data mix-ups across companies)
-3. **Temporal Accuracy**: Filter by fiscal year (e.g., FY2022 vs FY2023)
-
-**Example Chunk:**
-```
-Company: TCS (TCS.NS)
-Period: 2022-03-31 (annual)
-Statement: cash_flow
-Line Item: Capital Expenditure
-Value: -139,000,000,000.00
-```
-
-### Embedding Model
-
-**Model**: `sentence-transformers/all-MiniLM-L6-v2` (via ChromaDB)
-- Compact (384-dimensional embeddings)
-- Fast inference
-- Trained on semantic similarity tasks
-
----
-
-## Retrieval Logic
-
-### Hybrid Retrieval Architecture (`app/retrieval/hybrid_retriever.py`)
-
-**Query Classification** → Determines which retriever(s) to use:
-- **NUMERIC**: "What is the revenue?" → SQL only
-- **FACTUAL**: "Explain the company's business model" → Vector only
-- **HYBRID**: "Compare revenue to debt" → SQL + Vector
-
-### 1. SQL Retrieval (`app/retrieval/sql_retriever.py`)
-
-**Purpose**: Retrieve structured numerical data with high confidence.
-
-**Query Parsing:**
-1. **Keyword Extraction**: Split query into words (length > 3)
-2. **Year Extraction**: Regex to find fiscal years:
-   ```python
-   year_match = re.search(r'(?:20|FY)(\d{2})', query_text)
-   # "FY22" → 2022, "FY 2023" → 2023
-   ```
-3. **Fuzzy Matching**: Use `ILIKE` to match line item names:
-   ```sql
-   WHERE (line_item_name ILIKE '%revenue%' OR line_item_name ILIKE '%profit%')
-   AND fiscal_year = 2022
-   ```
-
-**SQL Query:**
+**SQL Query**:
 ```sql
-SELECT 
-    line_item_name,
-    line_item_value,
-    fiscal_year,
-    statement_type,
-    period_type
+SELECT line_item_name, line_item_value, fiscal_year, statement_type
 FROM financial_line_items
 JOIN financial_statements ON ...
-WHERE company_id = ? AND (keyword_matches) AND fiscal_year = ?
-ORDER BY period_date DESC
-LIMIT 100
+WHERE company_id = ? AND (line_item_name ILIKE '%revenue%' OR ...)
+AND fiscal_year = 2024
+ORDER BY period_date DESC LIMIT 60;
 ```
 
-**Output:**
-```python
-{
-    "source": "sql",
-    "line_item": "Total Revenue",
-    "value": 6959630000000.0,
-    "period": "FY2022 (Annual)",
-    "statement": "income_statement"
-}
-```
+#### Vector Retrieval (Semantic Search)
 
-### 2. Vector Retrieval (`app/core/vector_store.py`)
-
-**Purpose**: Semantic search for qualitative/contextual queries.
-
-**Similarity Search:**
+For factual queries, ChromaDB performs similarity search:
 ```python
 results = collection.query(
-    query_texts=["What is the operating margin?"],
+    query_texts=["What is the business model?"],
     n_results=5,
-    where={"ticker": "RELIANCE.NS"}  # Metadata filter
+    where={"ticker": "INFY.NS"}
 )
 ```
 
-**Metadata Filtering** (Critical for preventing data mix-ups):
-- **Ticker Filter**: Ensures only the queried company's data is retrieved
-- **Period Filter** (optional): e.g., `period_date >= "2023-01-01"`
+**Note**: In the current implementation, vector retrieval returns 0 results for most queries because the ingestion pipeline only stores numerical line items as text chunks. Qualitative data (10-K text, risk factors, news) is not currently ingested.
 
-**Distance Metric**: Cosine similarity (default in ChromaDB)
+### 4.4 Chunking Strategy
 
-### 3. Context Building
+**Challenge**: Financial statements are tabular. Traditional text chunking would destroy structure.
 
-**HybridRetriever** merges SQL and Vector results into a single context string:
+**Solution**: **Per-Line-Item Chunking**
+
+Each financial line item becomes a single chunk with full context:
+```
+Company: Infosys Ltd (INFY.NS)
+Period: 2024-12-31 (quarterly)
+Statement: income_statement
+Line Item: Operating Revenue
+Value: 5,076,000,000.00
+```
+
+**Advantages**:
+1. Precise retrieval: "Revenue?" matches only revenue chunks
+2. Metadata filtering: Filter by ticker, year, statement type
+3. LLM-friendly: Each chunk is self-contained
+
+### 4.5 Context Construction
+
+The **HybridRetriever** merges SQL and Vector results into a formatted string:
 
 ```
 === STRUCTURED FINANCIAL DATA (High Confidence) ===
-- Total Revenue: 6,959,630,000,000 (FY2022 (Annual), income_statement)
-- Net Income: 602,150,000,000 (FY2022 (Annual), income_statement)
+- Operating Revenue: 5,076,000,000.0 (FY2025 Q3, income_statement)
+- Total Revenue: 5,076,000,000.0 (FY2025 Q3, income_statement)
+- Net Income: 200,000,000.0 (FY2025 Q3, income_statement)
 
 === TEXTUAL CONTEXT FRAGMENTS ===
-- Company: Reliance Industries (RELIANCE.NS) | Period: 2022-03-31 | ...
+(Currently empty — no qualitative data ingested)
 ```
 
-This context is sent to the LLM with the strict governance prompt.
+### 4.6 Handling Missing/Low-Relevance Documents
 
----
-
-## Challenges Solved
-
-### 1. Windows AsyncIO Loop Crash
-
-**Problem**: ChromaDB uses SQLite, which is not thread-safe. On Windows, the ProactorEventLoop caused:
-```
-sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread
-```
-
-**Solution**: `asyncio.run_in_executor()` with thread-local ChromaDB clients
-
-**Implementation** (`app/core/vector_store.py`):
-```python
-def _get_collection_sync(self):
-    # Create client in CURRENT THREAD context
-    client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
-    return client.get_or_create_collection(...)
-
-async def add_texts(self, texts, metadatas):
-    def _add_sync():
-        collection = self._get_collection_sync()  # Client created in this thread
-        collection.add(documents=texts, metadatas=metadatas, ids=ids)
-    
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _add_sync)  # Runs in ThreadPoolExecutor
-```
-
-**Fallback**: On Windows, vector operations are skipped entirely if stability issues persist:
-```python
-if sys.platform == "win32":
-    return  # Skip vector ingestion on Windows
-```
-
-### 2. Hallucination Prevention (Strict Source-Grounding)
-
-**Problem**: LLMs may fabricate data or calculate incorrect ratios.
-
-**Solution**: Multi-layered governance system
-
-**Layer 1: System Prompt** (`app/llm/prompt_templates.py`):
-```python
-FINANCIAL_QA_PROMPT_STR = """
-1. DATA SCOPE & SOURCE OF TRUTH
-- You may ONLY use the data explicitly provided to you in the CONTEXT.
-- You MUST NOT use any external knowledge, prior training data, or assumptions.
-
-2. NUMERIC GOVERNANCE (CRITICAL)
-- ALL numeric values are computed OUTSIDE the LLM.
-- You MUST NOT perform any arithmetic calculations yourself.
-
-3. CAPITAL EXPENDITURE (CAPEX) RULE
-- Negative CapEx values represent a cash outflow for investing activities.
-- You MUST explicitly state that CapEx is sourced from the Cash Flow Statement.
-
-4. CITATION REQUIREMENT
-- Every factual statement must include a citation indicating:
-  - Fiscal year
-  - Statement type
-- Example: [Source: FY2022 (Annual), Income Statement]
-
-5. REFUSAL & SAFETY RULES
-- You MUST refuse to answer stock price predictions, future performance forecasts, etc.
-- Use the exact refusal phrase: "Cannot determine from available data."
-"""
-```
-
-**Layer 2: Temperature Control**:
-```python
-self.llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.0  # Maximum factuality, zero creativity
-)
-```
-
-**Layer 3: Context Validation**:
+**Empty Retrieval**:
 ```python
 if not context.strip():
-    return "I cannot answer this question as no relevant financial data was found."
+    return "Cannot determine from available data."
 ```
 
-### 3. Historical Data Retrieval
-
-**Problem**: Initially, queries like "Revenue in FY2022" failed because:
-1. Default `LIMIT 20` was too small to reach older years
-2. Annual data was mislabeled as "Q1" (generic first quarter)
-
-**Solution**:
-1. **Increased Retrieval Limit**: `limit=100` in SQL queries
-2. **Year-based Filtering**: Regex to extract year from query
-3. **Explicit Period Labeling**:
-   ```python
-   period = f"FY{fiscal_year} (Annual)" if period_type == "annual" 
-           else f"FY{fiscal_year} Q{fiscal_quarter}"
-   ```
+**Low Confidence**: The prompt instructs the LLM:
+> "If (and ONLY if) the required information is not found even after checking synonyms, respond with: 'Cannot determine from available data.'"
 
 ---
 
-## Verification & Testing
+## 5. Reliability and Rate-Limiting Handling
 
-### Test Companies
-- **Reliance Industries** (`RELIANCE.NS`): Conglomerate (Energy, Telecom, Retail)
-- **TCS** (`TCS.NS`): IT Services
-- **Infosys** (`INFY.NS`): IT Services
+### 5.1 Rate Limit Strategy
 
-### Test Queries
+**Problem**: Free-tier LLM APIs aggressively throttle requests. A single 429 error could crash the user experience.
 
-**1. Numerical Queries (SQL Retrieval)**
-```
-Query: "What is the total revenue for FY 2022?"
-Expected: Exact revenue value with citation [Source: FY2022 (Annual), Income Statement]
-```
+**Solution**: Multi-layer defense:
 
-**2. Historical Queries (Year Filtering)**
-```
-Query: "What was the capital expenditure in FY 2021?"
-Expected: Negative CapEx value explained as "cash outflow" + Cash Flow Statement citation
-```
+#### Layer 1: Tenacity Retry with Exponential Backoff
 
-**3. Refusal Tests (Governance)**
-```
-Query: "Will Reliance stock go up next month?"
-Expected: "Cannot determine from available data."
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+@retry(
+    retry=retry_if_exception_type(Exception),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def _execute_chain(self, query: str):
+    return await self.chain.ainvoke({"query": query})
 ```
 
-**4. Cash Flow Interpretation**
-```
-Query: "What is the CapEx?"
-Expected: 
-- Negative value shown
-- Explicit mention: "This is a cash outflow"
-- Citation: [Source: FY2025 (Annual), Cash Flow Statement]
-```
+**Behavior**: If a request fails, retry up to 5 times with delays of 4s, 8s, 16s... (capped at 10s).
 
-### Verification Script (`ingest_data.py`)
-```bash
-# Ingest data for a company
-python ingest_data.py RELIANCE.NS
+#### Layer 2: Graceful Error Messages
 
-# Query via Web UI
-http://localhost:8000
+```python
+except RetryError as e:
+    return ("**System Notice**: The AI model is currently experiencing high traffic. "
+            "Please wait a minute and try again.")
 ```
 
-### Database Verification
-```sql
--- Check ingested companies
-SELECT ticker, name, COUNT(statements.id) as statement_count
-FROM companies
-JOIN financial_statements ON companies.id = financial_statements.company_id
-GROUP BY ticker, name;
+Users never see raw tracebacks.
 
--- Check fiscal year coverage
-SELECT ticker, fiscal_year, COUNT(*) 
-FROM financial_statements
-JOIN companies ON companies.id = financial_statements.company_id
-WHERE ticker = 'RELIANCE.NS'
-GROUP BY ticker, fiscal_year
-ORDER BY fiscal_year DESC;
-```
+#### Layer 3: Model Selection
+
+We switched from `llama-3.3-70b-versatile` (1,000 req/day limit) to `llama-3.1-8b-instant` (14,400 req/day limit).
+
+**Trade-off**: Slightly less sophisticated reasoning, but vastly more reliable for continuous use.
+
+### 5.2 Caching (Future Work)
+
+Currently, there is no caching layer. Potential improvements:
+- **LRU Cache**: Cache identical query+ticker combinations
+- **Redis**: Distributed cache for multi-instance deployments
+- **Stale-While-Revalidate**: Serve cached data while refreshing in background
 
 ---
 
-## Deployment Considerations
+## 6. Financial Data Use Case (INFY.NS Example)
 
-### Environment Variables (`.env`)
-```bash
-GOOGLE_API_KEY=your_gemini_api_key
-DATABASE_URL=postgresql+asyncpg://user:password@localhost/financial_rag
-CHROMA_PERSIST_DIR=./data/chroma_db
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-DEBUG=False
+### 6.1 Data Sources
+
+| Source | Data Type | Coverage |
+|--------|-----------|----------|
+| `yfinance` | Balance Sheet, Income Statement, Cash Flow | 4-5 years (Annual + Quarterly) |
+| Yahoo Finance API | Company metadata (name, sector, industry) | Real-time |
+
+**Assumption**: Data is in INR (Indian Rupees) for NSE/BSE tickers. The system does not perform currency conversion.
+
+### 6.2 Data Extraction and Normalization
+
+**Raw Data** (from `yfinance`):
+```python
+{
+    "income_statement": {
+        "annual": {
+            "2024-03-31": {"Total Revenue": 1234000000, "Net Income": 567000000, ...},
+            "2023-03-31": {...}
+        },
+        "quarterly": {...}
+    }
+}
 ```
 
-### Database Initialization
-```bash
-python init_db.py
-```
+**Normalized Output** (stored in PostgreSQL):
 
-### Running the Application
-```bash
-# Development
-python run.py
+| Table | Fields |
+|-------|--------|
+| `companies` | id, ticker, name, sector, industry |
+| `financial_statements` | id, company_id, statement_type, period_type, fiscal_year, fiscal_quarter, period_date |
+| `financial_line_items` | id, statement_id, line_item_name, line_item_value, currency |
 
-# Production (with Gunicorn)
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
+### 6.3 Validation
 
-### Windows-Specific Notes
-1. **Vector Store**: Disabled by default on Windows to prevent crashes
-2. **Event Loop Policy**: `WindowsSelectorEventLoopPolicy` is set automatically
-3. **Ingestion**: Use `python ingest_data.py <ticker>` instead of Web UI ingestion
+The **DataValidator** checks for:
+- Missing critical fields (e.g., Total Revenue)
+- Negative values where unexpected
+- Extreme outliers (> 10x historical median)
 
-### Rate Limits
-- **Yahoo Finance**: No official API limits, but avoid excessive requests
-- **Gemini API**: 
-  - Free tier: 60 queries/minute
-  - Adjust `temperature=0.0` to minimize token usage
+Warnings are logged but do not block ingestion (non-critical flow).
 
-### Scaling Recommendations
-1. **Database**: Use connection pooling (`max_overflow=10` in SQLAlchemy)
-2. **Vector Store**: Consider Pinecone/Weaviate for production (better async support)
-3. **Caching**: Add Redis for frequently queried companies
-4. **Monitoring**: Integrate with Prometheus/Grafana for query latency tracking
+### 6.4 Example Queries and Responses
+
+| Query | Response |
+|-------|----------|
+| "What is the revenue for INFY.NS?" | "The Operating Revenue for INFY.NS in FY2025 Q3 is ₹5,076,000,000. [Source: FY2025 Q3, Income Statement]" |
+| "What is the Net Profit?" | "The Net Income for INFY.NS is ₹200,000,000 for FY2025 Q3. [Source: FY2025 Q3, Income Statement]" |
+| "Total Assets?" | "The Total Assets for INFY.NS are ₹X. [Source: FY2025 Q3, Balance Sheet]" |
+| "What are the key risks?" | "Cannot determine from available data." (No qualitative text ingested) |
+| "Will the stock go up?" | "Cannot determine from available data." (Speculation refused) |
 
 ---
 
-## Appendix: Key Files Reference
+## 7. Evaluation and Limitations
 
-| Component | File Path | Purpose |
-|-----------|-----------|---------|
-| Data Fetching | `app/ingestion/data_fetchers.py` | Yahoo Finance integration |
-| Normalization | `app/ingestion/data_normalizer.py` | Raw data → StandardizedFinancials |
-| Ingestion Service | `app/ingestion/ingestion_service.py` | Pipeline orchestration |
-| SQL Retrieval | `app/retrieval/sql_retriever.py` | Structured data queries |
-| Vector Store | `app/core/vector_store.py` | ChromaDB wrapper |
-| Hybrid Retriever | `app/retrieval/hybrid_retriever.py` | SQL + Vector merging |
-| LLM Service | `app/llm/llm_service.py` | Gemini integration |
-| Governance Prompt | `app/llm/prompt_templates.py` | Anti-hallucination rules |
-| Database Models | `app/models/models.py` | SQLAlchemy schemas |
-| API Routes | `app/api/routes/` | FastAPI endpoints |
+### 7.1 Evaluation Criteria
+
+| Criterion | How We Measure |
+|-----------|---------------|
+| **Accuracy** | Does the numeric value match the database? (Manual spot-checks) |
+| **Relevance** | Does the answer address the user's question? (Subjective review) |
+| **Hallucination Control** | Does the LLM fabricate data? (Compare response to retrieved context) |
+| **Citation Compliance** | Does every factual claim include `[Source: ...]`? |
+
+### 7.2 Known Limitations
+
+| Limitation | Impact | Potential Fix |
+|------------|--------|---------------|
+| **No Qualitative Data** | Cannot answer "What are the risks?" or "Business strategy?" | Ingest 10-K/annual report PDFs |
+| **Yahoo Finance Coverage** | Some smaller companies have incomplete data | Add fallback to alternate APIs |
+| **Rate Limits** | Heavy usage may still hit 429 errors | Upgrade to paid tier or add caching |
+| **Single Company per Query** | Cannot compare across companies in one query | Enhance retriever to accept multiple tickers |
+| **English Only** | UI and responses are English | Add i18n support |
+| **Currency Hardcoded** | Assumes INR; no conversion | Add forex lookup |
+
+### 7.3 Future Work
+
+1. **Ingest Qualitative Data**: Parse 10-K PDFs, earnings call transcripts
+2. **Multi-Company Comparison**: "Compare TCS vs INFY revenue"
+3. **Chart Generation**: Visualize trends over time
+4. **Fine-Tuned Classifier**: Train a smaller model for query classification (reduce LLM calls)
+5. **User Authentication**: Track query history per user
+6. **Streaming Responses**: Use SSE for real-time answer generation
 
 ---
 
+## 8. Conclusion
 
+### 8.1 Summary
+
+This Financial RAG system demonstrates how to combine:
+- **Structured Data Retrieval** (SQL) for precise numeric answers
+- **Semantic Search** (Vector DB) for flexible query matching
+- **LLM Generation** with strict anti-hallucination governance
+
+The result is an AI assistant that can reliably answer financial questions about publicly traded Indian companies, always citing its sources and refusing to speculate.
+
+### 8.2 Real-World Applications
+
+| Application | Description |
+|-------------|-------------|
+| **Equity Research** | Analysts can quickly pull key metrics without manual lookups |
+| **Due Diligence** | Investors can verify financial health before investment |
+| **Academic Projects** | Students can explore RAG architecture with a working example |
+| **Internal Dashboards** | Companies can build internal Q&A tools over proprietary data |
+
+### 8.3 Key Takeaways
+
+1. **RAG is not just "LLM + Search"**: The quality of retrieval, context construction, and prompt engineering determines success.
+2. **Hallucination prevention requires multiple layers**: Prompt rules, temperature control, and context validation.
+3. **Rate limits are a real production concern**: Always design for graceful degradation.
+4. **Structured data in RAG is underexplored**: Most RAG tutorials focus on text; SQL retrieval is just as powerful.
+
+---
+
+## Appendix: File Reference
+
+| Component | Path | Description |
+|-----------|------|-------------|
+| Entry Point | `run.py` | Starts Uvicorn server |
+| FastAPI App | `app/main.py` | Application factory, route mounting |
+| API Routes | `app/api/routes/` | `/ingest`, `/query`, `/health` endpoints |
+| Database Config | `app/core/database.py` | Async SQLAlchemy engine |
+| Models | `app/models/models.py` | Company, FinancialStatement, FinancialLineItem |
+| Ingestion | `app/ingestion/` | Data fetching, normalization, validation |
+| Retrieval | `app/retrieval/` | Classifier, SQL retriever, Vector store |
+| LLM Service | `app/llm/llm_service.py` | Groq integration, answer generation |
+| Prompt | `app/llm/prompt_templates.py` | Anti-hallucination rules |
+| Web UI | `static/` | HTML, CSS, JavaScript |
+
+---
+
+*Document generated for academic/professional review. For the latest code, see the [GitHub Repository](https://github.com/sital-tharu/RAG_fastAPI).*
