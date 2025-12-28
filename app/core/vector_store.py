@@ -13,15 +13,26 @@ class VectorStore:
         # We generally don't initialize PersistentClient here to avoid
         # "SQLite objects created in a thread can only be used in that same thread"
         self.settings = settings
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=self.settings.EMBEDDING_MODEL
-        )
+        self.embedding_fn = None
+        
+        import os
+        self.is_cloud = sys.platform == "win32" or os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT")
+        
+        # Only load heavy embedding model if NOT on cloud
+        if not self.is_cloud:
+            self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=self.settings.EMBEDDING_MODEL
+            )
 
     def _get_collection_sync(self):
         """Helper to get collection in the current thread context"""
         import chromadb
         # Create client inside the thread to satisfy SQLite requirements
         client = chromadb.PersistentClient(path=self.settings.CHROMA_PERSIST_DIR)
+        
+        # Safe access to embedding_fn (might be None on cloud)
+        # Note: In cloud mode, this method shouldn't be called anyway, 
+        # but if it is, we pass None which might fail if used for add/query without embeddings
         return client.get_or_create_collection(
             name="financial_data",
             embedding_function=self.embedding_fn
@@ -30,6 +41,9 @@ class VectorStore:
     async def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]]):
         """Add texts and metadata to the vector store (Non-blocking)"""
         if not texts:
+            return
+
+        if self.is_cloud:
             return
             
         import uuid
@@ -66,6 +80,10 @@ class VectorStore:
 
     async def similarity_search(self, query: str, n_results: int = 5, filter: Dict = None) -> List[Dict]:
         """Search for similar documents (Non-blocking)"""
+        # Quick exit if cloud/windows
+        if self.is_cloud:
+             return []
+             
         import asyncio
         
         # 1. Generate query embedding
