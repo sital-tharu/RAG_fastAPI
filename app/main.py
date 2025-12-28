@@ -11,17 +11,24 @@ from fastapi.responses import FileResponse
 from app.core.config import get_settings
 from app.api.routes import ingestion_routes, query_routes, health_routes
 
-# Fix for Windows ProactorEventLoop policy with psycopg
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+from contextlib import asynccontextmanager
+from app.core.database import engine, Base
+# Import models to ensure they are registered with Base.metadata
+import app.models.models
 
-settings = get_settings()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-create tables on startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="RAG-based Financial QA System using PostgreSQL + Vector DB + Gemini",
     version="1.0.0",
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    lifespan=lifespan
 )
 
 # Helpers for routes
