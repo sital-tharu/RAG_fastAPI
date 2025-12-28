@@ -68,7 +68,7 @@ class SQLRetriever:
         logger.debug(f"Extracted keywords from '{query_text}': {unique_keywords}")
         return unique_keywords
 
-    async def retrieve_financial_data(self, ticker: str, query_text: str, limit: int = 100) -> List[Dict]:
+    async def retrieve_financial_data(self, ticker: str, query_text: str, limit: int = 200) -> List[Dict]:
         """
         Retrieve financial data from PostgreSQL based on ticker and query context.
         Uses improved keyword extraction with financial term mappings.

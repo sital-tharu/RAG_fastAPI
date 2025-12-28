@@ -19,3 +19,5 @@ pytest
 pytest-asyncio
 httpx
 greenlet
+tenacity
+langchain-groq

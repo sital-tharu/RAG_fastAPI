@@ -1,8 +1,9 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from typing import Dict, Optional, Tuple
 import hashlib
 import time
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryError
 
 from app.core.config import get_settings
 from app.llm.prompt_templates import FINANCIAL_QA_PROMPT
@@ -13,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
-        # Initialize Google Gemini
+        # Initialize Groq
         # Temperature 0 for maximum factuality
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
-            google_api_key=settings.GOOGLE_API_KEY,
+        # Using llama-3.1-8b-instant for better rate limits on free tier
+        self.llm = ChatGroq(
+            model="llama-3.1-8b-instant",
+            api_key=settings.groq_api_key,
             temperature=0.0
         )
         
@@ -82,6 +84,14 @@ class LLMService:
         self._cache[cache_key] = (response, time.time())
         logger.debug(f"Cached response for key: {cache_key[:8]}...")
 
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        stop=stop_after_attempt(3), # Reduced retries to fail faster on rate limits
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def _execute_chain(self, inputs: Dict):
+        return await self.chain.ainvoke(inputs)
+
     async def generate_answer(self, question: str, context: str) -> str:
         """
         Generate answer from LLM based on context.
@@ -107,7 +117,7 @@ class LLMService:
         try:
             # invoke chain with input dict
             logger.info(f"Calling LLM for new query (cache miss)")
-            response = await self.chain.ainvoke({
+            response = await self._execute_chain({
                 "question": question,
                 "context": context
             })
@@ -118,8 +128,18 @@ class LLMService:
             self._add_to_cache(cache_key, answer)
             
             return answer
+            
+        except RetryError as e:
+            # This catches exceptions after all retries failed
+            logger.error(f"RetryError generating answer: {e}", exc_info=True)
+            return ("**System Notice**: The AI model is currently experiencing high traffic (Rate Limit Reached). "
+                    "Please wait a minute and try again.")
+                    
         except Exception as e:
             logger.error(f"Error generating answer: {e}", exc_info=True)
+            if "429" in str(e) or "Rate limit" in str(e): 
+                 return ("**System Notice**: The AI model rate limit was reached. "
+                         "Please wait a short while before asking another question.")
             return f"Error generating answer: {str(e)}"
     
     def clear_cache(self):
