@@ -16,6 +16,8 @@ from app.core.database import engine, Base
 # Import models to ensure they are registered with Base.metadata
 import app.models.models
 
+settings = get_settings()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Auto-create tables on startup
