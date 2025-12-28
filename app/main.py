@@ -3,11 +3,17 @@ import asyncio
 
 
 
+import sys
+import asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.core.config import get_settings
 from app.api.routes import ingestion_routes, query_routes, health_routes
+
+# Fix for Windows ProactorEventLoop policy with psycopg
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 settings = get_settings()
 

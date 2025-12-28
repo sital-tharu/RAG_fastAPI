@@ -20,9 +20,22 @@ class HybridRetriever:
         sql_results = []
         vector_results = []
         
+        print(f"DEBUG: Query Classification: {query_type}")
+        
         # SQL Retrieval (for Numeric or Hybrid)
         if query_type in [QueryType.NUMERIC, QueryType.HYBRID]:
-            sql_data = await self.sql_retriever.retrieve_financial_data(ticker, query)
+            # Reduced limit to 60 to ensure high relevance and fit in context
+            sql_data = await self.sql_retriever.retrieve_financial_data(ticker, query, limit=60)
+            print(f"DEBUG: SQL Retriever found {len(sql_data)} items")
+            
+            # Print breakdown of items found
+            item_names = [d['line_item'] for d in sql_data]
+            print(f"DEBUG: Items breakdown: {item_names[:10]} ...")
+            if any("revenue" in name.lower() for name in item_names):
+                print("DEBUG: ✅ 'Revenue' keyword found in retrieved data.")
+            else:
+                print("DEBUG: ❌ 'Revenue' NOT found in retrieved data!")
+                
             sql_results.extend(sql_data)
 
         # Vector Retrieval (for Factual or Hybrid)
@@ -32,6 +45,7 @@ class HybridRetriever:
                 n_results=5, 
                 filter={"ticker": ticker}
             )
+            print(f"DEBUG: Vector Retriever found {len(vector_data)} items")
             vector_results.extend(vector_data)
 
         return {

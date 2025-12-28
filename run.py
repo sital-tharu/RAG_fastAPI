@@ -13,6 +13,11 @@ async def main():
     config = uvicorn.Config("app.main:app", host="127.0.0.1", port=8000, reload=False)
     server = uvicorn.Server(config)
     
+    print("\n" + "="*50)
+    print("🚀 Server is running! Access it here:")
+    print("👉 http://localhost:8000")
+    print("="*50 + "\n")
+
     # Run the server in the current asyncio loop (SelectorEventLoop)
     await server.serve()
 

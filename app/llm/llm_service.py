@@ -3,8 +3,7 @@ from typing import Dict, Optional, Tuple
 import hashlib
 import time
 import logging
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-# from google.api_core.exceptions import ResourceExhausted
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryError
 
 from app.core.config import get_settings
 from app.llm.prompt_templates import FINANCIAL_QA_PROMPT
@@ -17,6 +16,7 @@ class LLMService:
     def __init__(self):
         # Initialize Groq
         # Temperature 0 for maximum factuality
+        # Using llama-3.1-8b-instant for better rate limits on free tier
         self.llm = ChatGroq(
             model="llama-3.1-8b-instant",
             api_key=settings.groq_api_key,
@@ -86,8 +86,8 @@ class LLMService:
 
     @retry(
         retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=4, max=10)
+        stop=stop_after_attempt(3), # Reduced retries to fail faster on rate limits
+        wait=wait_exponential(multiplier=1, min=2, max=10)
     )
     async def _execute_chain(self, inputs: Dict):
         return await self.chain.ainvoke(inputs)
@@ -128,8 +128,18 @@ class LLMService:
             self._add_to_cache(cache_key, answer)
             
             return answer
+            
+        except RetryError as e:
+            # This catches exceptions after all retries failed
+            logger.error(f"RetryError generating answer: {e}", exc_info=True)
+            return ("**System Notice**: The AI model is currently experiencing high traffic (Rate Limit Reached). "
+                    "Please wait a minute and try again.")
+                    
         except Exception as e:
             logger.error(f"Error generating answer: {e}", exc_info=True)
+            if "429" in str(e) or "Rate limit" in str(e): 
+                 return ("**System Notice**: The AI model rate limit was reached. "
+                         "Please wait a short while before asking another question.")
             return f"Error generating answer: {str(e)}"
     
     def clear_cache(self):
